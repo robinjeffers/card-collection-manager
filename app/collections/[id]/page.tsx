@@ -13,7 +13,7 @@ export default async function CollectionPage({
 
   const { id } = await params
   const found = await getCollectionById(id)
-  // Missing or not owned by this user — send them back to their collections.
+  // Collection doesn't exist — send them back to the shared list.
   if (!found) redirect("/")
 
   return (

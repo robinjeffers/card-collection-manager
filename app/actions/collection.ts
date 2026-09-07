@@ -1,6 +1,6 @@
 "use server"
 
-import { and, asc, eq } from "drizzle-orm"
+import { asc, eq } from "drizzle-orm"
 import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
@@ -9,6 +9,9 @@ import { collection as collectionTable } from "@/lib/db/schema"
 import { emptyCollection } from "@/lib/default-data"
 import type { Collection, CollectionSummary } from "@/lib/types"
 
+// Collections are shared: any signed-in user may view and edit every
+// collection. We only require a valid session (and stamp the creator on
+// create); we never scope queries by user id.
 async function getUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new Error("Unauthorized")
@@ -55,14 +58,10 @@ function normalizeCollection(data: Collection): { data: Collection; changed: boo
   return { data: changed ? { ...data, columns } : data, changed }
 }
 
-/** All of the signed-in user's collections, oldest first, with a card count. */
+/** Every collection (shared across all users), oldest first, with a card count. */
 export async function listCollections(): Promise<CollectionSummary[]> {
-  const userId = await getUserId()
-  const rows = await db
-    .select()
-    .from(collectionTable)
-    .where(eq(collectionTable.userId, userId))
-    .orderBy(asc(collectionTable.createdAt))
+  await getUserId()
+  const rows = await db.select().from(collectionTable).orderBy(asc(collectionTable.createdAt))
 
   return rows.map((r) => ({
     id: r.id,
@@ -72,16 +71,16 @@ export async function listCollections(): Promise<CollectionSummary[]> {
   }))
 }
 
-/** A single collection owned by the user, or null if missing / not theirs. */
+/** A single collection by id (shared across users), or null if it's missing. */
 export async function getCollectionById(
   id: string,
 ): Promise<{ id: string; name: string; data: Collection } | null> {
-  const userId = await getUserId()
+  await getUserId()
 
   const [existing] = await db
     .select()
     .from(collectionTable)
-    .where(and(eq(collectionTable.id, id), eq(collectionTable.userId, userId)))
+    .where(eq(collectionTable.id, id))
     .limit(1)
 
   if (!existing || !isCollection(existing.data)) return null
@@ -91,7 +90,7 @@ export async function getCollectionById(
     await db
       .update(collectionTable)
       .set({ data: normalized, updatedAt: new Date() })
-      .where(and(eq(collectionTable.id, id), eq(collectionTable.userId, userId)))
+      .where(eq(collectionTable.id, id))
   }
 
   return { id: existing.id, name: existing.name, data: normalized }
@@ -114,39 +113,37 @@ export async function createCollection(name: string): Promise<{ id: string }> {
 }
 
 export async function renameCollection(id: string, name: string): Promise<{ ok: true }> {
-  const userId = await getUserId()
+  await getUserId()
   const trimmed = name.trim()
   if (!trimmed) throw new Error("Name is required")
 
   await db
     .update(collectionTable)
     .set({ name: trimmed, updatedAt: new Date() })
-    .where(and(eq(collectionTable.id, id), eq(collectionTable.userId, userId)))
+    .where(eq(collectionTable.id, id))
 
   revalidatePath("/")
   return { ok: true }
 }
 
 export async function deleteCollection(id: string): Promise<{ ok: true }> {
-  const userId = await getUserId()
+  await getUserId()
 
-  await db
-    .delete(collectionTable)
-    .where(and(eq(collectionTable.id, id), eq(collectionTable.userId, userId)))
+  await db.delete(collectionTable).where(eq(collectionTable.id, id))
 
   revalidatePath("/")
   return { ok: true }
 }
 
-/** Persists the contents of one collection. Scoped so a user can only write their own. */
+/** Persists the contents of one collection. Any signed-in user may write. */
 export async function saveCollectionData(id: string, data: Collection): Promise<{ ok: true }> {
-  const userId = await getUserId()
+  await getUserId()
   if (!isCollection(data)) throw new Error("Invalid collection payload")
 
   await db
     .update(collectionTable)
     .set({ data, updatedAt: new Date() })
-    .where(and(eq(collectionTable.id, id), eq(collectionTable.userId, userId)))
+    .where(eq(collectionTable.id, id))
 
   return { ok: true }
 }

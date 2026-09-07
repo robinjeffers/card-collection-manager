@@ -4,7 +4,7 @@ import { desc, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
 import { auth } from "@/lib/auth"
-import { collection, user } from "@/lib/db/schema"
+import { user } from "@/lib/db/schema"
 import { isAdminEmail, requireAdmin, type Role } from "@/lib/admin"
 
 export type AdminUser = {
@@ -105,9 +105,9 @@ export async function deleteUser(userId: string) {
     throw new Error("You cannot delete your own account")
   }
 
-  // The collection table has no FK cascade, so remove it explicitly first.
-  // Sessions and accounts cascade automatically when the user row is deleted.
-  await db.delete(collection).where(eq(collection.userId, userId))
+  // Collections are shared and intentionally outlive their creator, so we do
+  // NOT delete them here (the collection table has no FK to the user). Only the
+  // user is removed; sessions and accounts cascade automatically.
   await db.delete(user).where(eq(user.id, userId))
   revalidatePath("/admin")
   return { ok: true }

@@ -13,11 +13,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
 
   const segments = (await params).path ?? []
 
-  // Ownership: the first path segment is the owner's user id. A user can only
-  // read files under their own namespace.
-  if (segments[0] !== session.user.id) {
-    return new NextResponse("Forbidden", { status: 403 })
-  }
+  // Collections (and their artwork) are shared, so any signed-in user may read
+  // any uploaded image. The first path segment is just the uploader's user id
+  // namespace; we no longer restrict reads to the caller's own namespace.
 
   // Resolve the target and confirm it stays inside UPLOAD_DIR (block `..`).
   const root = path.resolve(UPLOAD_DIR)

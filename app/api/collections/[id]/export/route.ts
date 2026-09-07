@@ -3,7 +3,7 @@ import path from "path"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
 import { zipSync, strToU8 } from "fflate"
-import { and, eq } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { collection as collectionTable } from "@/lib/db/schema"
@@ -56,13 +56,13 @@ function sanitizeFileName(name: string): string {
 }
 
 /** Safely resolve an /api/uploads/<userId>/<file> reference to a disk path. */
-function resolveUpload(ref: string, userId: string): { abs: string; base: string } | null {
+function resolveUpload(ref: string): { abs: string; base: string } | null {
   if (!ref.startsWith(UPLOAD_PREFIX)) return null
   const rel = ref.slice(UPLOAD_PREFIX.length).split("?")[0]
   const segments = rel.split("/").filter(Boolean).map(decodeURIComponent)
-  // Must live under the requesting user's namespace.
-  if (segments[0] !== userId) return null
 
+  // Collections are shared, so images may live under any user's namespace. We
+  // only enforce that the resolved path stays inside UPLOAD_DIR (block `..`).
   const root = path.resolve(UPLOAD_DIR)
   const abs = path.resolve(root, ...segments)
   if (abs !== root && !abs.startsWith(root + path.sep)) return null
@@ -75,13 +75,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!session?.user) {
     return new NextResponse("Unauthorized", { status: 401 })
   }
-  const userId = session.user.id
   const { id } = await params
 
   const [row] = await db
     .select()
     .from(collectionTable)
-    .where(and(eq(collectionTable.id, id), eq(collectionTable.userId, userId)))
+    .where(eq(collectionTable.id, id))
     .limit(1)
 
   if (!row || !isCollection(row.data)) {
@@ -122,7 +121,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     for (const colId of imageColumnIds) {
       const ref = values[colId]
       if (typeof ref !== "string" || !ref) continue
-      const resolved = resolveUpload(ref, userId)
+      const resolved = resolveUpload(ref)
       if (!resolved) continue // external URL or invalid — leave untouched
       const filename = uniqueImageName(cardName, path.extname(resolved.base))
       values[colId] = `images/${filename}`
