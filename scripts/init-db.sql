@@ -7,9 +7,12 @@ CREATE TABLE IF NOT EXISTS "user" (
   "email" text NOT NULL UNIQUE,
   "emailVerified" boolean NOT NULL DEFAULT false,
   "image" text,
+  "role" text NOT NULL DEFAULT 'user',
   "createdAt" timestamp NOT NULL DEFAULT now(),
   "updatedAt" timestamp NOT NULL DEFAULT now()
 );
+-- Upgrade path for volumes created before roles existed.
+ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "role" text NOT NULL DEFAULT 'user';
 
 CREATE TABLE IF NOT EXISTS "session" (
   "id" text PRIMARY KEY,

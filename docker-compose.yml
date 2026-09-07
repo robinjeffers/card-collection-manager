@@ -32,6 +32,9 @@ services:
       # across restarts and is served back through the app (works over the
       # Cloudflare Tunnel like any other request).
       UPLOAD_DIR: /data/uploads
+      # Comma-separated admin emails. These accounts get admin access
+      # automatically on sign-in. See .env.example.
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       NODE_ENV: production
     volumes:
       - uploads-data:/data/uploads

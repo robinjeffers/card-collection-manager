@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Check, Columns3, Loader2, LogOut, Plus, Search, Sparkles } from "lucide-react"
+import { Check, Columns3, Loader2, LogOut, Plus, Search, ShieldCheck, Sparkles } from "lucide-react"
 import { useCollection } from "@/hooks/use-collection"
 import { signOut } from "@/lib/auth-client"
 import { DataGrid } from "@/components/data-grid"
@@ -18,9 +18,11 @@ import type { CardRow, Collection } from "@/lib/types"
 export function CollectionManager({
   initialCollection,
   userName,
+  isAdmin = false,
 }: {
   initialCollection: Collection
   userName: string
+  isAdmin?: boolean
 }) {
   const router = useRouter()
   const {
@@ -110,6 +112,12 @@ export function CollectionManager({
             <Plus />
             New card
           </Button>
+          {isAdmin ? (
+            <Button variant="outline" onClick={() => router.push("/admin")}>
+              <ShieldCheck />
+              Admin
+            </Button>
+          ) : null}
           <div className="ml-1 flex items-center gap-2 border-l border-border pl-3">
             <span className="hidden text-sm text-muted-foreground sm:inline">{userName}</span>
             <Button

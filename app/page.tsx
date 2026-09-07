@@ -1,18 +1,21 @@
 import { redirect } from "next/navigation"
-import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
+import { getCurrentUser } from "@/lib/admin"
 import { getCollection } from "@/app/actions/collection"
 import { CollectionManager } from "@/components/collection-manager"
 
 export default async function Page() {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) redirect("/sign-in")
+  const current = await getCurrentUser()
+  if (!current) redirect("/sign-in")
 
   const collection = await getCollection()
 
   return (
     <main className="min-h-svh bg-background">
-      <CollectionManager initialCollection={collection} userName={session.user.name || session.user.email} />
+      <CollectionManager
+        initialCollection={collection}
+        userName={current.name}
+        isAdmin={current.role === "admin"}
+      />
     </main>
   )
 }
