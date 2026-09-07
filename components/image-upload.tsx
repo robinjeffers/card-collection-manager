@@ -14,6 +14,7 @@ export function ImageUpload({ value, onChange, variant = "cell" }: ImageUploadPr
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [dragActive, setDragActive] = useState(false)
 
   async function upload(file: File) {
     setError(null)
@@ -46,6 +47,34 @@ export function ImageUpload({ value, onChange, variant = "cell" }: ImageUploadPr
     inputRef.current?.click()
   }
 
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!uploading) setDragActive(true)
+  }
+
+  const onDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(false)
+  }
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(false)
+    if (uploading) return
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith("image/")) {
+      setError("Please drop an image file")
+      return
+    }
+    void upload(file)
+  }
+
+  const dragProps = { onDragOver, onDragLeave, onDrop }
+
   const hiddenInput = (
     <input ref={inputRef} type="file" accept={ACCEPT_ATTRIBUTE} className="hidden" onChange={onPick} />
   )
@@ -57,7 +86,10 @@ export function ImageUpload({ value, onChange, variant = "cell" }: ImageUploadPr
         <button
           type="button"
           onClick={pick}
-          className="relative flex aspect-[4/5] w-full items-center justify-center overflow-hidden rounded-lg border border-dashed border-border bg-muted/30 text-muted-foreground transition-colors hover:border-ring hover:text-foreground"
+          {...dragProps}
+          className={`relative flex aspect-[4/5] w-full items-center justify-center overflow-hidden rounded-lg border border-dashed bg-muted/30 text-muted-foreground transition-colors hover:border-ring hover:text-foreground ${
+            dragActive ? "border-ring bg-primary/10 text-foreground" : "border-border"
+          }`}
         >
           {value ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -65,9 +97,14 @@ export function ImageUpload({ value, onChange, variant = "cell" }: ImageUploadPr
           ) : (
             <span className="flex flex-col items-center gap-2 p-6 text-center">
               <ImageIcon className="size-6" />
-              <span className="text-sm">Click to upload artwork</span>
+              <span className="text-sm">{dragActive ? "Drop image to upload" : "Click or drag image to upload"}</span>
             </span>
           )}
+          {dragActive && value ? (
+            <span className="absolute inset-0 flex items-center justify-center bg-primary/20 text-sm font-medium text-foreground">
+              Drop to replace
+            </span>
+          ) : null}
           {uploading ? (
             <span className="absolute inset-0 flex items-center justify-center bg-background/70">
               <Loader2 className="size-5 animate-spin" />
@@ -97,12 +134,14 @@ export function ImageUpload({ value, onChange, variant = "cell" }: ImageUploadPr
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2" {...dragProps}>
       {hiddenInput}
       <button
         type="button"
         onClick={pick}
-        className="relative size-9 shrink-0 overflow-hidden rounded-md border border-border bg-muted"
+        className={`relative size-9 shrink-0 overflow-hidden rounded-md border bg-muted transition-colors ${
+          dragActive ? "border-ring ring-2 ring-ring/40" : "border-border"
+        }`}
         aria-label={value ? "Replace image" : "Upload image"}
       >
         {value ? (
