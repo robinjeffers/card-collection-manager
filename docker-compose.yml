@@ -28,6 +28,10 @@ services:
       # Set this to the public URL the app is served from (e.g. your
       # Cloudflare Tunnel hostname) so auth cookies and origins are correct.
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      # Optional extra origins allowed to sign in (comma-separated). Needed when
+      # you reach the app on more than one hostname, e.g. the tunnel domain AND
+      # http://localhost:3000. See .env.example.
+      BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-}
       # Uploaded card artwork is written here; the volume below persists it
       # across restarts and is served back through the app (works over the
       # Cloudflare Tunnel like any other request).
