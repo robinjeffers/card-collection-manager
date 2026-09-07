@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { Layers, LogOut, Pencil, Plus, ShieldCheck, Sparkles, Trash2 } from "lucide-react"
+import { Download, Layers, LogOut, Pencil, Plus, ShieldCheck, Sparkles, Trash2 } from "lucide-react"
 import { signOut } from "@/lib/auth-client"
 import {
   createCollection,
@@ -131,6 +131,16 @@ export function CollectionsHome({
               </span>
             </button>
             <div className="mt-3 flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`Export ${c.name}`}
+                onClick={() => {
+                  window.location.href = `/api/collections/${c.id}/export`
+                }}
+              >
+                <Download className="size-4" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"

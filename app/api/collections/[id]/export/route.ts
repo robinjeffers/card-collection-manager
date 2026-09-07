@@ -57,10 +57,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const source = row.data
   const imageColumnIds = new Set(source.columns.filter((c) => c.type === "image").map((c) => c.id))
 
-  // Bundle referenced images and rewrite cell values to relative paths so the
-  // export is self-contained and portable to another instance.
-  const files: Record<string, Uint8Array> = {}
-  const seen = new Set<string>()
+  // Walk the rows once: rewrite each in-app image reference to a relative
+  // `images/<file>` path and collect the unique disk paths we need to read.
+  const toRead = new Map<string, string>() // basename -> absolute path
 
   const rows: CardRow[] = source.rows.map((r) => {
     const values = { ...r.values }
@@ -70,22 +69,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       const resolved = resolveUpload(ref, userId)
       if (!resolved) continue // external URL or invalid — leave untouched
       values[colId] = `images/${resolved.base}`
-      seen.add(resolved.base)
-      // Mark for reading; dedupe by basename.
-      if (!(resolved.base in files)) {
-        files[resolved.base] = new Uint8Array() // placeholder, filled below
-        ;(files as Record<string, Uint8Array>)[resolved.base] = resolved.abs as unknown as Uint8Array
-      }
+      toRead.set(resolved.base, resolved.abs)
     }
     return { ...r, values }
   })
 
   // Read the actual bytes for each unique referenced image.
   const zipEntries: Record<string, Uint8Array> = {}
-  for (const base of seen) {
-    // Find the absolute path we stashed while walking rows.
-    const abs = filePathFor(source, userId, base)
-    if (!abs) continue
+  for (const [base, abs] of toRead) {
     try {
       const data = await readFile(abs)
       zipEntries[`images/${base}`] = new Uint8Array(data)
@@ -114,18 +105,4 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       "Cache-Control": "no-store",
     },
   })
-}
-
-/** Re-resolve a stored basename back to its absolute upload path for reading. */
-function filePathFor(source: Collection, userId: string, base: string): string | null {
-  const imageColumnIds = new Set(source.columns.filter((c) => c.type === "image").map((c) => c.id))
-  for (const r of source.rows) {
-    for (const colId of imageColumnIds) {
-      const ref = r.values[colId]
-      if (typeof ref !== "string") continue
-      const resolved = resolveUpload(ref, userId)
-      if (resolved && resolved.base === base) return resolved.abs
-    }
-  }
-  return null
 }
