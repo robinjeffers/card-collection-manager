@@ -3,11 +3,16 @@ import { nextCookies } from "better-auth/next-js"
 import { Pool } from "pg"
 import { isPublicSignupEnabled } from "@/lib/signup"
 
+/** Drop a trailing slash so a URL matches the browser Origin header exactly. */
+function normalizeOrigin(url: string | undefined | null) {
+  return url ? url.trim().replace(/\/+$/, "") : undefined
+}
+
 function resolveBaseURL() {
-  if (process.env.BETTER_AUTH_URL) return process.env.BETTER_AUTH_URL
+  if (process.env.BETTER_AUTH_URL) return normalizeOrigin(process.env.BETTER_AUTH_URL)
   if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`
-  return process.env.V0_RUNTIME_URL
+  return normalizeOrigin(process.env.V0_RUNTIME_URL)
 }
 
 function resolveTrustedOrigins() {
@@ -15,7 +20,7 @@ function resolveTrustedOrigins() {
   if (process.env.NODE_ENV === "development") {
     origins.add("http://localhost:3000")
     for (const key of ["V0_RUNTIME_URL", "V0_DEV_APP_URL", "V0_BUILD_URL", "V0_SANDBOX_URL"]) {
-      const value = process.env[key]
+      const value = normalizeOrigin(process.env[key])
       if (value) origins.add(value)
     }
   } else {
@@ -23,7 +28,14 @@ function resolveTrustedOrigins() {
     if (process.env.VERCEL_PROJECT_PRODUCTION_URL) origins.add(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`)
     // Self-hosted (Docker + Cloudflare Tunnel): the public origin comes from
     // BETTER_AUTH_URL, not the Vercel-provided variables.
-    if (process.env.BETTER_AUTH_URL) origins.add(process.env.BETTER_AUTH_URL)
+    const baseOrigin = normalizeOrigin(process.env.BETTER_AUTH_URL)
+    if (baseOrigin) origins.add(baseOrigin)
+  }
+  // Optional extra origins (comma-separated) for setups that serve the app on
+  // more than one hostname, e.g. a tunnel domain plus a LAN address.
+  for (const extra of (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? "").split(",")) {
+    const value = normalizeOrigin(extra)
+    if (value) origins.add(value)
   }
   return [...origins]
 }
