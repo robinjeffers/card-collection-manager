@@ -84,7 +84,7 @@ export function CollectionManager({
   }
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-[1600px] flex-col px-4 py-6 lg:px-8">
+    <div className="flex min-h-svh w-full flex-col px-4 py-6 lg:px-6">
       <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <Button
