@@ -41,7 +41,6 @@ export function DataGrid({
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-border bg-muted/40">
-            <th className="w-10 px-2 py-2.5" aria-label="Select" />
             {columns.map((col) => {
               const Icon = TYPE_ICON[col.type]
               return (
@@ -78,20 +77,14 @@ export function DataGrid({
               <tr
                 key={row.id}
                 onClick={() => onSelect(row.id)}
+                aria-selected={selected}
                 className={cn(
-                  "border-b border-border/60 transition-colors last:border-0",
-                  selected ? "bg-primary/10" : "hover:bg-muted/40",
+                  "cursor-pointer border-b border-border/60 transition-colors last:border-0",
+                  selected
+                    ? "bg-primary/10 shadow-[inset_2px_0_0_0_var(--color-primary)]"
+                    : "hover:bg-muted/40",
                 )}
               >
-                <td className="px-2 py-1.5 text-center">
-                  <span
-                    className={cn(
-                      "inline-block size-2.5 rounded-full ring-2 transition-colors",
-                      selected ? "bg-primary ring-primary/30" : "bg-transparent ring-border",
-                    )}
-                    aria-hidden="true"
-                  />
-                </td>
                 {columns.map((col) => (
                   <td key={col.id} className="px-3 py-1.5 align-middle" onClick={(e) => e.stopPropagation()}>
                     <GridCell
