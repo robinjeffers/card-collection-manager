@@ -2,6 +2,7 @@
 
 import { Hash, ImageIcon, Lock, Pencil, Tag, Trash2, Type } from "lucide-react"
 import { TagInput } from "@/components/tag-input"
+import { ImageUpload } from "@/components/image-upload"
 import { tagStyle } from "@/lib/tag-color"
 import { cn } from "@/lib/utils"
 import type { CardRow, CellValue, Column } from "@/lib/types"
@@ -155,28 +156,7 @@ function GridCell({ column, value, onChange, onCreateTagOption }: GridCellProps)
   }
 
   if (column.type === "image") {
-    const src = String(value ?? "")
-    return (
-      <div className="flex items-center gap-2">
-        <div className="size-8 shrink-0 overflow-hidden rounded-md border border-border bg-muted">
-          {src ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={src || "/placeholder.svg"}
-              alt=""
-              className="size-full object-cover"
-              crossOrigin="anonymous"
-            />
-          ) : null}
-        </div>
-        <input
-          value={src}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="/cards/…"
-          className="h-8 w-full min-w-32 rounded-md border border-transparent bg-transparent px-2 text-sm outline-none hover:border-border focus:border-ring focus:bg-background"
-        />
-      </div>
-    )
+    return <ImageUpload value={String(value ?? "")} onChange={(url) => onChange(url)} />
   }
 
   return (

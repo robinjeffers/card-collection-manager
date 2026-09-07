@@ -27,6 +27,10 @@ ENV HOSTNAME=0.0.0.0
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 
+# Persistent directory for uploaded artwork (mounted as a volume at runtime).
+ENV UPLOAD_DIR=/data/uploads
+RUN mkdir -p /data/uploads && chown -R nextjs:nodejs /data
+
 # The standalone output contains a minimal server + only the needed deps.
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

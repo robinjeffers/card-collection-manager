@@ -5,7 +5,7 @@ export const DECK_TAGS = ["Consumable", "Tier 1", "Tier 2", "Tier 3", "Spells", 
 export const defaultCollection: Collection = {
   columns: [
     { id: "name", name: "Card Name", type: "text", locked: true },
-    { id: "artwork", name: "Artwork Path", type: "image", locked: true, isArtwork: true },
+    { id: "artwork", name: "Artwork", type: "image", locked: true, isArtwork: true },
     { id: "tags", name: "Deck Tags", type: "tag", options: [...DECK_TAGS], locked: true },
     { id: "strength", name: "Strength", type: "number", locked: true },
     { id: "dexterity", name: "Dexterity", type: "number", locked: true },

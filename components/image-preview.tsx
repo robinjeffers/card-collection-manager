@@ -48,13 +48,12 @@ export function ImagePreview({ row, columns }: ImagePreviewProps) {
             alt={name || "Card artwork"}
             className="max-h-full max-w-full object-contain"
             onError={() => setErrored(true)}
-            crossOrigin="anonymous"
           />
         ) : (
           <div className="flex flex-col items-center gap-2 p-8 text-center text-muted-foreground">
             <ImageOff className="size-6" />
             <p className="text-sm">
-              {src ? "Image could not be loaded" : "No artwork path set"}
+              {src ? "Image could not be loaded" : "No artwork uploaded"}
             </p>
           </div>
         )}

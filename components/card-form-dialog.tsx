@@ -5,6 +5,7 @@ import { Modal } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Input, Label } from "@/components/ui/field"
 import { TagInput } from "@/components/tag-input"
+import { ImageUpload } from "@/components/image-upload"
 import type { CardRow, CellValue, Column } from "@/lib/types"
 
 interface CardFormDialogProps {
@@ -73,13 +74,18 @@ export function CardFormDialog({
                 onChange={(v) => setValue(col.id, v)}
                 onCreateOption={(opt) => onCreateTagOption(col.id, opt)}
               />
+            ) : col.type === "image" ? (
+              <ImageUpload
+                value={String(values[col.id] ?? "")}
+                onChange={(url) => setValue(col.id, url)}
+                variant="full"
+              />
             ) : (
               <Input
                 id={`field-${col.id}`}
                 type={col.type === "number" ? "number" : "text"}
                 inputMode={col.type === "number" ? "numeric" : undefined}
                 value={values[col.id] == null ? "" : String(values[col.id])}
-                placeholder={col.type === "image" ? "/cards/my-card.png or https://…" : ""}
                 onChange={(e) =>
                   setValue(col.id, col.type === "number" ? e.target.value : e.target.value)
                 }

@@ -13,3 +13,6 @@ __v0_jsx-dev-runtime.ts
 node_modules
 .next/
 .DS_Store
+
+# Locally uploaded artwork (dev fallback for UPLOAD_DIR)
+uploads-data/
