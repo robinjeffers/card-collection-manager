@@ -8,7 +8,7 @@ import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { collection as collectionTable } from "@/lib/db/schema"
 import { UPLOAD_DIR } from "@/lib/uploads"
-import type { CardRow, Collection } from "@/lib/types"
+import type { CardRow, CellValue, Collection } from "@/lib/types"
 
 const UPLOAD_PREFIX = "/api/uploads/"
 
@@ -19,6 +19,29 @@ function isCollection(value: unknown): value is Collection {
     Array.isArray((value as Collection).columns) &&
     Array.isArray((value as Collection).rows)
   )
+}
+
+/** Escape a single CSV field per RFC 4180 (quote if it contains , " or newline). */
+function csvField(value: string): string {
+  if (/[",\r\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`
+  }
+  return value
+}
+
+/** Render a cell value to a flat string for the spreadsheet. */
+function cellToText(value: CellValue): string {
+  if (value === null || value === undefined) return ""
+  if (Array.isArray(value)) return value.join("; ")
+  return String(value)
+}
+
+/** Build a CSV (header row = column names) from the collection's columns/rows. */
+function buildCsv(columns: Collection["columns"], rows: CardRow[]): string {
+  const header = columns.map((c) => csvField(c.name)).join(",")
+  const lines = rows.map((r) => columns.map((c) => csvField(cellToText(r.values[c.id]))).join(","))
+  // Prepend a UTF-8 BOM so Excel detects the encoding correctly.
+  return "\uFEFF" + [header, ...lines].join("\r\n")
 }
 
 /** Safely resolve an /api/uploads/<userId>/<file> reference to a disk path. */
@@ -94,6 +117,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   zipEntries["collection.json"] = strToU8(JSON.stringify(manifest, null, 2))
+  zipEntries["collection.csv"] = strToU8(buildCsv(source.columns, rows))
 
   const zipped = zipSync(zipEntries, { level: 6 })
   const safeName = row.name.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "collection"
