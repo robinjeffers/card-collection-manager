@@ -24,6 +24,37 @@ function isCollection(value: unknown): value is Collection {
 }
 
 /**
+ * Repairs collections saved by earlier versions of the app:
+ * the artwork column used to be labelled "Artwork Path" and could have been
+ * persisted before the upload feature existed. Ensure it is named "Artwork"
+ * and typed as an image column so it renders the upload control.
+ * Returns the (possibly) corrected collection plus whether anything changed.
+ */
+function normalizeCollection(data: Collection): { data: Collection; changed: boolean } {
+  let changed = false
+  const columns = data.columns.map((col) => {
+    if (col.isArtwork || col.id === "artwork") {
+      const fixed = { ...col }
+      if (fixed.name === "Artwork Path") {
+        fixed.name = "Artwork"
+        changed = true
+      }
+      if (fixed.type !== "image") {
+        fixed.type = "image"
+        changed = true
+      }
+      if (!fixed.isArtwork) {
+        fixed.isArtwork = true
+        changed = true
+      }
+      return fixed
+    }
+    return col
+  })
+  return { data: changed ? { ...data, columns } : data, changed }
+}
+
+/**
  * Returns the signed-in user's collection, seeding the default collection
  * on first access so every account starts with the sample cards.
  */
@@ -37,7 +68,14 @@ export async function getCollection(): Promise<Collection> {
     .limit(1)
 
   if (existing && isCollection(existing.data)) {
-    return existing.data
+    const { data: normalized, changed } = normalizeCollection(existing.data)
+    if (changed) {
+      await db
+        .update(collectionTable)
+        .set({ data: normalized, updatedAt: new Date() })
+        .where(eq(collectionTable.userId, userId))
+    }
+    return normalized
   }
 
   await db
