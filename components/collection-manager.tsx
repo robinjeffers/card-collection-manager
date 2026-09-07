@@ -2,13 +2,14 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Check, Columns3, Loader2, LogOut, Plus, Search, ShieldCheck } from "lucide-react"
+import { ArrowLeft, Check, Columns3, ImagePlus, Loader2, LogOut, Plus, Search, ShieldCheck } from "lucide-react"
 import { useCollection } from "@/hooks/use-collection"
 import { signOut } from "@/lib/auth-client"
 import { DataGrid } from "@/components/data-grid"
 import { ImagePreview } from "@/components/image-preview"
 import { AddColumnDialog } from "@/components/add-column-dialog"
 import { CardFormDialog } from "@/components/card-form-dialog"
+import { ImportImagesDialog } from "@/components/import-images-dialog"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/ui/field"
 import { tagStyle } from "@/lib/tag-color"
@@ -36,6 +37,7 @@ export function CollectionManager({
     removeColumn,
     addTagOption,
     addRow,
+    addRows,
     updateRow,
     updateCell,
     removeRow,
@@ -46,10 +48,12 @@ export function CollectionManager({
   const [activeTags, setActiveTags] = useState<string[]>([])
   const [columnDialog, setColumnDialog] = useState(false)
   const [cardDialog, setCardDialog] = useState(false)
+  const [importDialog, setImportDialog] = useState(false)
   const [editingRow, setEditingRow] = useState<CardRow | null>(null)
 
   const tagCol = collection.columns.find((c) => c.type === "tag")
   const allTagOptions = tagCol?.options ?? []
+  const artworkCol = collection.columns.find((c) => c.isArtwork) ?? collection.columns.find((c) => c.type === "image")
 
   const filteredRows = useMemo(() => {
     return collection.rows.filter((row) => {
@@ -117,6 +121,12 @@ export function CollectionManager({
             <Columns3 />
             Add column
           </Button>
+          {artworkCol ? (
+            <Button variant="outline" onClick={() => setImportDialog(true)}>
+              <ImagePlus />
+              Import images
+            </Button>
+          ) : null}
           <Button onClick={openNewCard}>
             <Plus />
             New card
@@ -202,6 +212,18 @@ export function CollectionManager({
       </div>
 
       <AddColumnDialog open={columnDialog} onClose={() => setColumnDialog(false)} onAdd={addColumn} />
+      {artworkCol ? (
+        <ImportImagesDialog
+          open={importDialog}
+          onClose={() => setImportDialog(false)}
+          onImport={(imported) => {
+            const ids = addRows(
+              imported.map((item) => ({ name: item.name, [artworkCol.id]: item.url })),
+            )
+            if (ids[0]) setSelectedId(ids[0])
+          }}
+        />
+      ) : null}
       <CardFormDialog
         open={cardDialog}
         onClose={() => setCardDialog(false)}

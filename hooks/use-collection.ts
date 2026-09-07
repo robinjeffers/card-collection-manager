@@ -76,6 +76,12 @@ export function useCollection(initial: Collection, collectionId: string) {
     return id
   }, [])
 
+  const addRows = useCallback((rowsValues: Record<string, CellValue>[]) => {
+    const created = rowsValues.map((values) => ({ id: uid("card"), values }))
+    setCollection((prev) => ({ ...prev, rows: [...created, ...prev.rows] }))
+    return created.map((r) => r.id)
+  }, [])
+
   const updateRow = useCallback((rowId: string, values: Record<string, CellValue>) => {
     setCollection((prev) => ({
       ...prev,
@@ -101,6 +107,7 @@ export function useCollection(initial: Collection, collectionId: string) {
     removeColumn,
     addTagOption,
     addRow,
+    addRows,
     updateRow,
     updateCell,
     removeRow,
