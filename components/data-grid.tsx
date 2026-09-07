@@ -86,7 +86,7 @@ export function DataGrid({
                 )}
               >
                 {columns.map((col) => (
-                  <td key={col.id} className="px-3 py-1.5 align-middle" onClick={(e) => e.stopPropagation()}>
+                  <td key={col.id} className="px-3 py-1.5 align-middle">
                     <GridCell
                       column={col}
                       value={row.values[col.id]}
