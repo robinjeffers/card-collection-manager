@@ -17,8 +17,14 @@ function resolveBaseURL() {
 
 function resolveTrustedOrigins() {
   const origins = new Set<string>()
+  // Always trust local access on any port. For a self-hosted app, reaching it
+  // at localhost/127.0.0.1 is inherently the operator's own machine, so this is
+  // safe and means signing in at http://localhost:3000 works without any extra
+  // configuration — even when BETTER_AUTH_URL points at a public tunnel domain.
+  // (Better Auth supports "*" wildcard patterns in trustedOrigins.)
+  origins.add("http://localhost:*")
+  origins.add("http://127.0.0.1:*")
   if (process.env.NODE_ENV === "development") {
-    origins.add("http://localhost:3000")
     for (const key of ["V0_RUNTIME_URL", "V0_DEV_APP_URL", "V0_BUILD_URL", "V0_SANDBOX_URL"]) {
       const value = normalizeOrigin(process.env[key])
       if (value) origins.add(value)
