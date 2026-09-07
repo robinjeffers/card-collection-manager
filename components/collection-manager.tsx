@@ -35,6 +35,7 @@ export function CollectionManager({
     saving,
     addColumn,
     removeColumn,
+    reorderColumns,
     addTagOption,
     addRow,
     addRows,
@@ -201,6 +202,7 @@ export function CollectionManager({
               if (selectedId === id) setSelectedId(null)
             }}
             onDeleteColumn={removeColumn}
+            onReorderColumns={reorderColumns}
             onUpdateCell={updateCell}
             onCreateTagOption={addTagOption}
           />

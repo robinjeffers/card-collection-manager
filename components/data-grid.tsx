@@ -1,6 +1,7 @@
 "use client"
 
-import { Hash, ImageIcon, Lock, Pencil, Tag, Trash2, Type } from "lucide-react"
+import { useRef, useState } from "react"
+import { GripVertical, Hash, ImageIcon, Lock, Pencil, Tag, Trash2, Type } from "lucide-react"
 import { TagInput } from "@/components/tag-input"
 import { ImageUpload } from "@/components/image-upload"
 import { tagStyle } from "@/lib/tag-color"
@@ -22,8 +23,14 @@ interface DataGridProps {
   onEdit: (row: CardRow) => void
   onDeleteRow: (id: string) => void
   onDeleteColumn: (id: string) => void
+  onReorderColumns: (from: number, to: number) => void
   onUpdateCell: (rowId: string, columnId: string, value: CellValue) => void
   onCreateTagOption: (columnId: string, option: string) => void
+}
+
+/** Number columns shrink to fit their header/content; others keep a min width. */
+function colWidthClass(type: Column["type"]) {
+  return type === "number" ? "w-px whitespace-nowrap" : "min-w-40"
 }
 
 export function DataGrid({
@@ -34,22 +41,57 @@ export function DataGrid({
   onEdit,
   onDeleteRow,
   onDeleteColumn,
+  onReorderColumns,
   onUpdateCell,
   onCreateTagOption,
 }: DataGridProps) {
+  const dragIndexRef = useRef<number | null>(null)
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [overIndex, setOverIndex] = useState<number | null>(null)
+
+  const resetDrag = () => {
+    dragIndexRef.current = null
+    setDragIndex(null)
+    setOverIndex(null)
+  }
+
   return (
     <div className="overflow-x-auto rounded-xl border border-border">
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-border bg-muted/40">
-            {columns.map((col) => {
+            {columns.map((col, i) => {
               const Icon = TYPE_ICON[col.type]
               return (
                 <th
                   key={col.id}
-                  className="min-w-40 px-3 py-2.5 text-left font-medium whitespace-nowrap"
+                  draggable
+                  onDragStart={() => {
+                    dragIndexRef.current = i
+                    setDragIndex(i)
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    if (overIndex !== i) setOverIndex(i)
+                  }}
+                  onDrop={() => {
+                    const from = dragIndexRef.current
+                    if (from !== null) onReorderColumns(from, i)
+                    resetDrag()
+                  }}
+                  onDragEnd={resetDrag}
+                  className={cn(
+                    "px-3 py-2.5 text-left font-medium whitespace-nowrap transition-colors",
+                    colWidthClass(col.type),
+                    dragIndex === i && "opacity-40",
+                    overIndex === i && dragIndex !== i && "bg-primary/15",
+                  )}
                 >
                   <div className="flex items-center gap-1.5">
+                    <GripVertical
+                      className="size-3.5 shrink-0 cursor-grab text-muted-foreground/50"
+                      aria-hidden="true"
+                    />
                     <Icon className="size-3.5 text-muted-foreground" />
                     <span>{col.name}</span>
                     {col.locked ? (
@@ -87,7 +129,7 @@ export function DataGrid({
                 )}
               >
                 {columns.map((col) => (
-                  <td key={col.id} className="px-3 py-1.5 align-middle">
+                  <td key={col.id} className={cn("px-3 py-1.5 align-middle", colWidthClass(col.type))}>
                     <GridCell
                       column={col}
                       value={row.values[col.id]}
@@ -159,12 +201,16 @@ function GridCell({ column, value, onChange, onCreateTagOption }: GridCellProps)
     return <ImageUpload value={String(value ?? "")} onChange={(url) => onChange(url)} />
   }
 
+  const isNumber = column.type === "number"
   return (
     <input
-      type={column.type === "number" ? "number" : "text"}
+      type={isNumber ? "number" : "text"}
       value={value == null ? "" : String(value)}
-      onChange={(e) => onChange(column.type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
-      className="h-8 w-full rounded-md border border-transparent bg-transparent px-2 text-sm outline-none hover:border-border focus:border-ring focus:bg-background"
+      onChange={(e) => onChange(isNumber ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
+      className={cn(
+        "h-8 rounded-md border border-transparent bg-transparent px-2 text-sm outline-none hover:border-border focus:border-ring focus:bg-background",
+        isNumber ? "w-16 min-w-0 text-right" : "w-full",
+      )}
     />
   )
 }

@@ -49,6 +49,17 @@ export function useCollection(initial: Collection, collectionId: string) {
     }))
   }, [])
 
+  const reorderColumns = useCallback((from: number, to: number) => {
+    setCollection((prev) => {
+      if (from === to || from < 0 || to < 0) return prev
+      const cols = [...prev.columns]
+      if (from >= cols.length || to >= cols.length) return prev
+      const [moved] = cols.splice(from, 1)
+      cols.splice(to, 0, moved)
+      return { ...prev, columns: cols }
+    })
+  }, [])
+
   const removeColumn = useCallback((columnId: string) => {
     setCollection((prev) => ({
       columns: prev.columns.filter((c) => c.id !== columnId),
@@ -105,6 +116,7 @@ export function useCollection(initial: Collection, collectionId: string) {
     saving,
     addColumn,
     removeColumn,
+    reorderColumns,
     addTagOption,
     addRow,
     addRows,
