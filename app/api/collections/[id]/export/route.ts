@@ -44,6 +44,17 @@ function buildCsv(columns: Collection["columns"], rows: CardRow[]): string {
   return "\uFEFF" + [header, ...lines].join("\r\n")
 }
 
+/** Turn a Card Name into a safe filesystem base name (no extension). */
+function sanitizeFileName(name: string): string {
+  return name
+    .trim()
+    .replace(/[/\\?%*:|"<>]/g, "-") // strip characters illegal in filenames
+    .replace(/\s+/g, " ")
+    .replace(/^\.+/, "") // no leading dots (hidden files)
+    .slice(0, 100)
+    .trim()
+}
+
 /** Safely resolve an /api/uploads/<userId>/<file> reference to a disk path. */
 function resolveUpload(ref: string, userId: string): { abs: string; base: string } | null {
   if (!ref.startsWith(UPLOAD_PREFIX)) return null
@@ -80,29 +91,52 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const source = row.data
   const imageColumnIds = new Set(source.columns.filter((c) => c.type === "image").map((c) => c.id))
 
+  // The column holding each card's name — used to name the exported image files.
+  const nameColId =
+    source.columns.find((c) => c.id === "name")?.id ??
+    source.columns.find((c) => c.type === "text")?.id ??
+    source.columns[0]?.id
+
   // Walk the rows once: rewrite each in-app image reference to a relative
-  // `images/<file>` path and collect the unique disk paths we need to read.
-  const toRead = new Map<string, string>() // basename -> absolute path
+  // `images/<Card Name>.<ext>` path and collect the disk paths to read.
+  // Exported filenames are derived from the card name and de-duplicated so
+  // repeated or empty names never collide.
+  const toRead: { filename: string; abs: string }[] = []
+  const usedNames = new Set<string>()
+
+  const uniqueImageName = (cardName: string, ext: string) => {
+    const base = sanitizeFileName(cardName) || "card"
+    let candidate = `${base}${ext}`
+    let n = 2
+    while (usedNames.has(candidate.toLowerCase())) {
+      candidate = `${base}-${n}${ext}`
+      n += 1
+    }
+    usedNames.add(candidate.toLowerCase())
+    return candidate
+  }
 
   const rows: CardRow[] = source.rows.map((r) => {
     const values = { ...r.values }
+    const cardName = nameColId ? cellToText(r.values[nameColId]) : ""
     for (const colId of imageColumnIds) {
       const ref = values[colId]
       if (typeof ref !== "string" || !ref) continue
       const resolved = resolveUpload(ref, userId)
       if (!resolved) continue // external URL or invalid — leave untouched
-      values[colId] = `images/${resolved.base}`
-      toRead.set(resolved.base, resolved.abs)
+      const filename = uniqueImageName(cardName, path.extname(resolved.base))
+      values[colId] = `images/${filename}`
+      toRead.push({ filename, abs: resolved.abs })
     }
     return { ...r, values }
   })
 
-  // Read the actual bytes for each unique referenced image.
+  // Read the actual bytes for each referenced image.
   const zipEntries: Record<string, Uint8Array> = {}
-  for (const [base, abs] of toRead) {
+  for (const { filename, abs } of toRead) {
     try {
       const data = await readFile(abs)
-      zipEntries[`images/${base}`] = new Uint8Array(data)
+      zipEntries[`images/${filename}`] = new Uint8Array(data)
     } catch {
       // Skip missing files rather than failing the whole export.
     }
