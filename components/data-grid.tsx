@@ -89,7 +89,7 @@ export function DataGrid({
                     overIndex === i && dragIndex !== i && "bg-primary/15",
                   )}
                 >
-                  <div className="flex items-center gap-1.5">
+                  <div className={cn("flex items-center gap-1.5", col.type === "number" && "justify-center")}>
                     <GripVertical
                       className="size-3.5 shrink-0 cursor-grab text-muted-foreground/50"
                       aria-hidden="true"
@@ -132,7 +132,14 @@ export function DataGrid({
                 )}
               >
                 {columns.map((col) => (
-                  <td key={col.id} className={cn("px-3 py-1.5 align-middle", colWidthClass(col.type))}>
+                  <td
+                    key={col.id}
+                    className={cn(
+                      "px-3 py-1.5 align-middle",
+                      colWidthClass(col.type),
+                      col.type === "number" && "text-center",
+                    )}
+                  >
                     <GridCell
                       column={col}
                       value={row.values[col.id]}
@@ -214,7 +221,7 @@ function GridCell({ column, value, onChange, onCreateTagOption, onDeleteTagOptio
         type="number"
         value={value == null ? "" : String(value)}
         onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))}
-        className="h-8 w-16 min-w-0 rounded-md border border-transparent bg-transparent px-2 text-right text-sm outline-none hover:border-border focus:border-ring focus:bg-background"
+        className="h-8 w-16 min-w-0 rounded-md border border-transparent bg-transparent px-2 text-center text-sm outline-none hover:border-border focus:border-ring focus:bg-background"
       />
     )
   }
