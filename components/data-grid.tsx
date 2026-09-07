@@ -201,16 +201,26 @@ function GridCell({ column, value, onChange, onCreateTagOption }: GridCellProps)
     return <ImageUpload value={String(value ?? "")} onChange={(url) => onChange(url)} />
   }
 
-  const isNumber = column.type === "number"
+  if (column.type === "number") {
+    return (
+      <input
+        type="number"
+        value={value == null ? "" : String(value)}
+        onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))}
+        className="h-8 w-16 min-w-0 rounded-md border border-transparent bg-transparent px-2 text-right text-sm outline-none hover:border-border focus:border-ring focus:bg-background"
+      />
+    )
+  }
+
+  // Text: grow the field to fit its content (bounded) so the full name is visible.
+  const text = value == null ? "" : String(value)
   return (
     <input
-      type={isNumber ? "number" : "text"}
-      value={value == null ? "" : String(value)}
-      onChange={(e) => onChange(isNumber ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
-      className={cn(
-        "h-8 rounded-md border border-transparent bg-transparent px-2 text-sm outline-none hover:border-border focus:border-ring focus:bg-background",
-        isNumber ? "w-16 min-w-0 text-right" : "w-full",
-      )}
+      type="text"
+      value={text}
+      onChange={(e) => onChange(e.target.value)}
+      style={{ width: `${Math.min(Math.max(text.length + 3, 14), 60)}ch` }}
+      className="h-8 min-w-0 rounded-md border border-transparent bg-transparent px-2 text-sm outline-none hover:border-border focus:border-ring focus:bg-background"
     />
   )
 }

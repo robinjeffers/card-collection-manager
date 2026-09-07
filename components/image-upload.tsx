@@ -136,13 +136,10 @@ export function ImageUpload({ value, onChange, variant = "cell" }: ImageUploadPr
   return (
     <div className="flex items-center gap-2" {...dragProps}>
       {hiddenInput}
-      <button
-        type="button"
-        onClick={pick}
+      <div
         className={`relative size-9 shrink-0 overflow-hidden rounded-md border bg-muted transition-colors ${
           dragActive ? "border-ring ring-2 ring-ring/40" : "border-border"
         }`}
-        aria-label={value ? "Replace image" : "Upload image"}
       >
         {value ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -157,7 +154,7 @@ export function ImageUpload({ value, onChange, variant = "cell" }: ImageUploadPr
             <Loader2 className="size-4 animate-spin" />
           </span>
         ) : null}
-      </button>
+      </div>
       <div className="flex min-w-0 flex-col leading-tight">
         <button type="button" onClick={pick} className="text-left text-sm text-muted-foreground hover:text-foreground">
           {uploading ? "Uploading…" : value ? "Replace" : "Upload"}
