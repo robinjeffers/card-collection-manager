@@ -1,8 +1,10 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Columns3, Plus, Search, Sparkles } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Check, Columns3, Loader2, LogOut, Plus, Search, Sparkles } from "lucide-react"
 import { useCollection } from "@/hooks/use-collection"
+import { signOut } from "@/lib/auth-client"
 import { DataGrid } from "@/components/data-grid"
 import { ImagePreview } from "@/components/image-preview"
 import { AddColumnDialog } from "@/components/add-column-dialog"
@@ -11,12 +13,19 @@ import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/ui/field"
 import { tagStyle } from "@/lib/tag-color"
 import { cn } from "@/lib/utils"
-import type { CardRow } from "@/lib/types"
+import type { CardRow, Collection } from "@/lib/types"
 
-export function CollectionManager() {
+export function CollectionManager({
+  initialCollection,
+  userName,
+}: {
+  initialCollection: Collection
+  userName: string
+}) {
+  const router = useRouter()
   const {
     collection,
-    hydrated,
+    saving,
     addColumn,
     removeColumn,
     addTagOption,
@@ -24,7 +33,7 @@ export function CollectionManager() {
     updateRow,
     updateCell,
     removeRow,
-  } = useCollection()
+  } = useCollection(initialCollection)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [search, setSearch] = useState("")
@@ -73,8 +82,22 @@ export function CollectionManager() {
           </div>
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-balance">Card Collection</h1>
-            <p className="text-sm text-muted-foreground">
-              {collection.rows.length} card{collection.rows.length === 1 ? "" : "s"} · saved locally
+            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <span>
+                {collection.rows.length} card{collection.rows.length === 1 ? "" : "s"}
+              </span>
+              <span aria-hidden="true">·</span>
+              {saving ? (
+                <span className="flex items-center gap-1">
+                  <Loader2 className="size-3 animate-spin" />
+                  Saving
+                </span>
+              ) : (
+                <span className="flex items-center gap-1">
+                  <Check className="size-3" />
+                  Saved
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -87,6 +110,21 @@ export function CollectionManager() {
             <Plus />
             New card
           </Button>
+          <div className="ml-1 flex items-center gap-2 border-l border-border pl-3">
+            <span className="hidden text-sm text-muted-foreground sm:inline">{userName}</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Sign out"
+              onClick={async () => {
+                await signOut()
+                router.push("/sign-in")
+                router.refresh()
+              }}
+            >
+              <LogOut className="size-4" />
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -125,24 +163,20 @@ export function CollectionManager() {
             ) : null}
           </div>
 
-          {hydrated ? (
-            <DataGrid
-              columns={collection.columns}
-              rows={filteredRows}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onEdit={openEditCard}
-              onDeleteRow={(id) => {
-                removeRow(id)
-                if (selectedId === id) setSelectedId(null)
-              }}
-              onDeleteColumn={removeColumn}
-              onUpdateCell={updateCell}
-              onCreateTagOption={addTagOption}
-            />
-          ) : (
-            <div className="h-64 animate-pulse rounded-xl border border-border bg-muted/30" />
-          )}
+          <DataGrid
+            columns={collection.columns}
+            rows={filteredRows}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onEdit={openEditCard}
+            onDeleteRow={(id) => {
+              removeRow(id)
+              if (selectedId === id) setSelectedId(null)
+            }}
+            onDeleteColumn={removeColumn}
+            onUpdateCell={updateCell}
+            onCreateTagOption={addTagOption}
+          />
         </div>
 
         <aside className="lg:sticky lg:top-6 lg:self-start">

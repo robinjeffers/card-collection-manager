@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cards}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cards}
+      POSTGRES_DB: ${POSTGRES_DB:-cards}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # Runs once on first boot to create the schema in an empty volume.
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cards} -d ${POSTGRES_DB:-cards}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-cards}:${POSTGRES_PASSWORD:-cards}@db:5432/${POSTGRES_DB:-cards}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in your .env}
+      # Set this to the public URL the app is served from (e.g. your
+      # Cloudflare Tunnel hostname) so auth cookies and origins are correct.
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+
+volumes:
+  db-data:

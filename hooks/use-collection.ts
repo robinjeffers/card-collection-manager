@@ -2,49 +2,45 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { CellValue, Collection, Column } from "@/lib/types"
-import { defaultCollection } from "@/lib/default-data"
-
-const STORAGE_KEY = "card-collection-v1"
-
-function loadCollection(): Collection {
-  if (typeof window === "undefined") return defaultCollection
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return defaultCollection
-    const parsed = JSON.parse(raw) as Collection
-    if (!parsed?.columns || !parsed?.rows) return defaultCollection
-    return parsed
-  } catch {
-    return defaultCollection
-  }
-}
+import { saveCollection } from "@/app/actions/collection"
 
 function uid(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`
 }
 
-export function useCollection() {
-  const [collection, setCollection] = useState<Collection>(defaultCollection)
-  const [hydrated, setHydrated] = useState(false)
+/**
+ * Manages the signed-in user's collection. The initial value is loaded on the
+ * server and passed in; every change is debounced and persisted to the
+ * database, scoped to the current user by the server action.
+ */
+export function useCollection(initial: Collection) {
+  const [collection, setCollection] = useState<Collection>(initial)
+  const [saving, setSaving] = useState(false)
   const firstRun = useRef(true)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    setCollection(loadCollection())
-    setHydrated(true)
-  }, [])
-
-  useEffect(() => {
-    if (!hydrated) return
     if (firstRun.current) {
       firstRun.current = false
       return
     }
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(collection))
-    } catch {
-      // storage full or unavailable — ignore
+    if (timer.current) clearTimeout(timer.current)
+    setSaving(true)
+    timer.current = setTimeout(async () => {
+      try {
+        await saveCollection(collection)
+      } catch {
+        // network/auth error — the local state is preserved and the next
+        // change will retry the save.
+      } finally {
+        setSaving(false)
+      }
+    }, 600)
+
+    return () => {
+      if (timer.current) clearTimeout(timer.current)
     }
-  }, [collection, hydrated])
+  }, [collection])
 
   const addColumn = useCallback((column: Omit<Column, "id">) => {
     setCollection((prev) => ({
@@ -100,7 +96,7 @@ export function useCollection() {
 
   return {
     collection,
-    hydrated,
+    saving,
     addColumn,
     removeColumn,
     addTagOption,
