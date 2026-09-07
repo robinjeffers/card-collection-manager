@@ -110,6 +110,7 @@ export function DataGrid({
                 </th>
               )
             })}
+            <th className="w-full" aria-hidden="true" />
             <th className="w-20 px-3 py-2.5 text-right font-medium">Actions</th>
           </tr>
         </thead>
@@ -138,6 +139,7 @@ export function DataGrid({
                     />
                   </td>
                 ))}
+                <td className="w-full" aria-hidden="true" />
                 <td className="px-3 py-1.5">
                   <div className="flex items-center justify-end gap-1">
                     <button
