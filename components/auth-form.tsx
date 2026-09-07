@@ -35,7 +35,20 @@ export function AuthForm({
         : await signIn.email({ email, password })
 
       if (result.error) {
-        setError(isSignUp ? "Could not create account. Try a different email." : "Invalid email or password.")
+        const code = result.error.code
+        // A genuine bad-credentials / duplicate-email result gets a friendly
+        // message; anything else (e.g. a rejected Origin when BETTER_AUTH_URL
+        // does not match the domain you're visiting) shows the real reason so
+        // it's actually diagnosable instead of masked as a password problem.
+        const isCredentialError =
+          code === "INVALID_EMAIL_OR_PASSWORD" ||
+          code === "USER_ALREADY_EXISTS" ||
+          result.error.status === 401
+        if (isCredentialError) {
+          setError(isSignUp ? "Could not create account. Try a different email." : "Invalid email or password.")
+        } else {
+          setError(result.error.message || result.error.statusText || "Sign-in failed. Please try again.")
+        }
         return
       }
       router.push("/")
