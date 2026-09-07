@@ -81,6 +81,21 @@ export function useCollection(initial: Collection, collectionId: string) {
     }))
   }, [])
 
+  const removeTagOption = useCallback((columnId: string, option: string) => {
+    setCollection((prev) => ({
+      ...prev,
+      columns: prev.columns.map((c) =>
+        c.id === columnId ? { ...c, options: (c.options ?? []).filter((o) => o !== option) } : c,
+      ),
+      // Also strip the removed tag from every card that had it selected.
+      rows: prev.rows.map((r) => {
+        const v = r.values[columnId]
+        if (!Array.isArray(v)) return r
+        return { ...r, values: { ...r.values, [columnId]: (v as string[]).filter((t) => t !== option) } }
+      }),
+    }))
+  }, [])
+
   const addRow = useCallback((values: Record<string, CellValue>) => {
     const id = uid("card")
     setCollection((prev) => ({ ...prev, rows: [{ id, values }, ...prev.rows] }))
@@ -118,6 +133,7 @@ export function useCollection(initial: Collection, collectionId: string) {
     removeColumn,
     reorderColumns,
     addTagOption,
+    removeTagOption,
     addRow,
     addRows,
     updateRow,

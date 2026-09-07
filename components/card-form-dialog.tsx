@@ -16,6 +16,7 @@ interface CardFormDialogProps {
   row?: CardRow | null
   onSubmit: (values: Record<string, CellValue>) => void
   onCreateTagOption: (columnId: string, option: string) => void
+  onDeleteTagOption: (columnId: string, option: string) => void
 }
 
 function emptyValues(columns: Column[]): Record<string, CellValue> {
@@ -31,6 +32,7 @@ export function CardFormDialog({
   row,
   onSubmit,
   onCreateTagOption,
+  onDeleteTagOption,
 }: CardFormDialogProps) {
   const [values, setValues] = useState<Record<string, CellValue>>(emptyValues(columns))
 
@@ -73,6 +75,7 @@ export function CardFormDialog({
                 options={col.options ?? []}
                 onChange={(v) => setValue(col.id, v)}
                 onCreateOption={(opt) => onCreateTagOption(col.id, opt)}
+                onDeleteOption={(opt) => onDeleteTagOption(col.id, opt)}
               />
             ) : col.type === "image" ? (
               <ImageUpload

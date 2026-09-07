@@ -37,6 +37,7 @@ export function CollectionManager({
     removeColumn,
     reorderColumns,
     addTagOption,
+    removeTagOption,
     addRow,
     addRows,
     updateRow,
@@ -177,7 +178,7 @@ export function CollectionManager({
                       key={tag}
                       type="button"
                       onClick={() => toggleTagFilter(tag)}
-                      style={active ? tagStyle(tag) : undefined}
+                      style={active ? tagStyle(tag, allTagOptions) : undefined}
                       className={cn(
                         "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium transition-colors",
                         active ? "" : "border-border text-muted-foreground hover:text-foreground",
@@ -205,6 +206,7 @@ export function CollectionManager({
             onReorderColumns={reorderColumns}
             onUpdateCell={updateCell}
             onCreateTagOption={addTagOption}
+            onDeleteTagOption={removeTagOption}
           />
         </div>
 
@@ -232,6 +234,7 @@ export function CollectionManager({
         columns={collection.columns}
         row={editingRow}
         onCreateTagOption={addTagOption}
+        onDeleteTagOption={removeTagOption}
         onSubmit={(values) => {
           if (editingRow) {
             updateRow(editingRow.id, values)

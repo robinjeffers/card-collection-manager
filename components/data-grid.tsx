@@ -26,6 +26,7 @@ interface DataGridProps {
   onReorderColumns: (from: number, to: number) => void
   onUpdateCell: (rowId: string, columnId: string, value: CellValue) => void
   onCreateTagOption: (columnId: string, option: string) => void
+  onDeleteTagOption: (columnId: string, option: string) => void
 }
 
 /** Number columns shrink to fit their header/content; others keep a min width. */
@@ -44,6 +45,7 @@ export function DataGrid({
   onReorderColumns,
   onUpdateCell,
   onCreateTagOption,
+  onDeleteTagOption,
 }: DataGridProps) {
   const dragIndexRef = useRef<number | null>(null)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
@@ -136,6 +138,7 @@ export function DataGrid({
                       value={row.values[col.id]}
                       onChange={(v) => onUpdateCell(row.id, col.id, v)}
                       onCreateTagOption={(opt) => onCreateTagOption(col.id, opt)}
+                      onDeleteTagOption={(opt) => onDeleteTagOption(col.id, opt)}
                     />
                   </td>
                 ))}
@@ -185,9 +188,10 @@ interface GridCellProps {
   value: CellValue
   onChange: (value: CellValue) => void
   onCreateTagOption: (option: string) => void
+  onDeleteTagOption: (option: string) => void
 }
 
-function GridCell({ column, value, onChange, onCreateTagOption }: GridCellProps) {
+function GridCell({ column, value, onChange, onCreateTagOption, onDeleteTagOption }: GridCellProps) {
   if (column.type === "tag") {
     return (
       <TagInput
@@ -195,6 +199,7 @@ function GridCell({ column, value, onChange, onCreateTagOption }: GridCellProps)
         options={column.options ?? []}
         onChange={onChange}
         onCreateOption={onCreateTagOption}
+        onDeleteOption={onDeleteTagOption}
       />
     )
   }

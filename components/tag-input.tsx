@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Check, Plus, X } from "lucide-react"
+import { Check, Plus, Trash2, X } from "lucide-react"
 import { tagStyle } from "@/lib/tag-color"
 import { fieldClass } from "@/components/ui/field"
 import { cn } from "@/lib/utils"
@@ -11,9 +11,11 @@ interface TagInputProps {
   options: string[]
   onChange: (value: string[]) => void
   onCreateOption?: (option: string) => void
+  /** When provided, each option can be permanently removed from the column. */
+  onDeleteOption?: (option: string) => void
 }
 
-export function TagInput({ value, options, onChange, onCreateOption }: TagInputProps) {
+export function TagInput({ value, options, onChange, onCreateOption, onDeleteOption }: TagInputProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const rootRef = useRef<HTMLDivElement>(null)
@@ -29,6 +31,13 @@ export function TagInput({ value, options, onChange, onCreateOption }: TagInputP
 
   const toggle = (tag: string) => {
     onChange(value.includes(tag) ? value.filter((t) => t !== tag) : [...value, tag])
+  }
+
+  const deleteOption = (tag: string) => {
+    // Drop it from this cell first (keeps local form state consistent), then
+    // remove the option from the column everywhere.
+    if (value.includes(tag)) onChange(value.filter((t) => t !== tag))
+    onDeleteOption?.(tag)
   }
 
   const trimmed = query.trim()
@@ -58,7 +67,7 @@ export function TagInput({ value, options, onChange, onCreateOption }: TagInputP
           value.map((tag) => (
             <span
               key={tag}
-              style={tagStyle(tag)}
+              style={tagStyle(tag, options)}
               className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs font-medium"
             >
               {tag}
@@ -97,20 +106,33 @@ export function TagInput({ value, options, onChange, onCreateOption }: TagInputP
             {filtered.map((tag) => {
               const active = value.includes(tag)
               return (
-                <li key={tag}>
+                <li key={tag} className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => toggle(tag)}
-                    className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                    className="flex flex-1 items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
                   >
                     <span
-                      style={tagStyle(tag)}
+                      style={tagStyle(tag, options)}
                       className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-xs font-medium"
                     >
                       {tag}
                     </span>
                     {active ? <Check className="size-4 text-primary" /> : null}
                   </button>
+                  {onDeleteOption ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        deleteOption(tag)
+                      }}
+                      className="shrink-0 rounded-md p-1.5 text-muted-foreground/60 hover:bg-destructive/15 hover:text-destructive"
+                      aria-label={`Delete tag "${tag}" from this column`}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  ) : null}
                 </li>
               )
             })}

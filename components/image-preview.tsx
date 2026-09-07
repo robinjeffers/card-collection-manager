@@ -65,7 +65,7 @@ export function ImagePreview({ row, columns }: ImagePreviewProps) {
             {tags.map((tag) => (
               <span
                 key={tag}
-                style={tagStyle(tag)}
+                style={tagStyle(tag, tagCol?.options)}
                 className="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium"
               >
                 {tag}
