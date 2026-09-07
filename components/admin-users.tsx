@@ -2,10 +2,12 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, ShieldCheck, Trash2, User as UserIcon } from "lucide-react"
-import { deleteUser, setUserRole, type AdminUser } from "@/app/actions/admin"
+import { ArrowLeft, Plus, ShieldCheck, Trash2, User as UserIcon } from "lucide-react"
+import { createAccount, deleteUser, setUserRole, type AdminUser } from "@/app/actions/admin"
+import type { Role } from "@/lib/admin"
 import { Button } from "@/components/ui/button"
 import { Modal } from "@/components/ui/modal"
+import { Input, Label, Select } from "@/components/ui/field"
 import { cn } from "@/lib/utils"
 
 export function AdminUsers({
@@ -21,7 +23,34 @@ export function AdminUsers({
   const [error, setError] = useState<string | null>(null)
   const [toDelete, setToDelete] = useState<AdminUser | null>(null)
 
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [form, setForm] = useState({ name: "", email: "", password: "", role: "user" as Role })
+  const [savingNew, setSavingNew] = useState(false)
+
   const adminCount = users.filter((u) => u.role === "admin").length
+
+  const openCreate = () => {
+    setForm({ name: "", email: "", password: "", role: "user" })
+    setCreateError(null)
+    setCreating(true)
+  }
+
+  const submitCreate = () => {
+    setCreateError(null)
+    setSavingNew(true)
+    startTransition(async () => {
+      try {
+        await createAccount(form)
+        setCreating(false)
+        router.refresh()
+      } catch (e) {
+        setCreateError(e instanceof Error ? e.message : "Could not create the account")
+      } finally {
+        setSavingNew(false)
+      }
+    })
+  }
 
   const runAction = (id: string, fn: () => Promise<unknown>) => {
     setError(null)
@@ -52,10 +81,16 @@ export function AdminUsers({
             </p>
           </div>
         </div>
-        <Button variant="outline" onClick={() => router.push("/")}>
-          <ArrowLeft />
-          Back to collection
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => router.push("/")}>
+            <ArrowLeft />
+            Back to collection
+          </Button>
+          <Button onClick={openCreate}>
+            <Plus />
+            New account
+          </Button>
+        </div>
       </header>
 
       {error ? (
@@ -137,6 +172,81 @@ export function AdminUsers({
           </tbody>
         </table>
       </div>
+
+      <Modal
+        open={creating}
+        onClose={() => (savingNew ? null : setCreating(false))}
+        title="Create account"
+        description="The new user can sign in immediately with this email and password."
+      >
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={(e) => {
+            e.preventDefault()
+            submitCreate()
+          }}
+        >
+          <div>
+            <Label htmlFor="new-account-name">Name</Label>
+            <Input
+              id="new-account-name"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              required
+              placeholder="Ada Lovelace"
+            />
+          </div>
+          <div>
+            <Label htmlFor="new-account-email">Email</Label>
+            <Input
+              id="new-account-email"
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              required
+              placeholder="user@example.com"
+            />
+          </div>
+          <div>
+            <Label htmlFor="new-account-password">Password</Label>
+            <Input
+              id="new-account-password"
+              type="text"
+              value={form.password}
+              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+              required
+              minLength={8}
+              placeholder="At least 8 characters"
+            />
+          </div>
+          <div>
+            <Label htmlFor="new-account-role">Role</Label>
+            <Select
+              id="new-account-role"
+              value={form.role}
+              onChange={(e) => setForm((f) => ({ ...f, role: e.target.value === "admin" ? "admin" : "user" }))}
+            >
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </Select>
+          </div>
+
+          {createError ? (
+            <p role="alert" className="rounded-md bg-destructive/15 px-3 py-2 text-sm text-destructive">
+              {createError}
+            </p>
+          ) : null}
+
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" disabled={savingNew} onClick={() => setCreating(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={savingNew}>
+              {savingNew ? "Creating…" : "Create account"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       <Modal
         open={toDelete !== null}

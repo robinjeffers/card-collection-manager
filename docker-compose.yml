@@ -35,6 +35,9 @@ services:
       # Comma-separated admin emails. These accounts get admin access
       # automatically on sign-in. See .env.example.
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      # Leave unset for invite-only (admins create accounts); "true" allows
+      # public self-service signup. See .env.example.
+      ALLOW_PUBLIC_SIGNUP: ${ALLOW_PUBLIC_SIGNUP:-false}
       NODE_ENV: production
     volumes:
       - uploads-data:/data/uploads

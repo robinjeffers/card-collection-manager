@@ -3,6 +3,7 @@
 import { desc, eq } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { db } from "@/lib/db"
+import { auth } from "@/lib/auth"
 import { collection, user } from "@/lib/db/schema"
 import { isAdminEmail, requireAdmin, type Role } from "@/lib/admin"
 
@@ -33,6 +34,52 @@ export async function listUsers(): Promise<AdminUser[]> {
     role: r.role === "admin" ? "admin" : "user",
     isConfiguredAdmin: isAdminEmail(r.email),
   }))
+}
+
+export async function createAccount(input: {
+  name: string
+  email: string
+  password: string
+  role: Role
+}) {
+  await requireAdmin()
+
+  const name = input.name.trim()
+  const email = input.email.trim().toLowerCase()
+  const password = input.password
+  const role: Role = input.role === "admin" ? "admin" : "user"
+
+  if (!name) throw new Error("Name is required")
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Enter a valid email address")
+  if (password.length < 8) throw new Error("Password must be at least 8 characters")
+
+  const existing = await db.select({ id: user.id }).from(user).where(eq(user.email, email)).limit(1)
+  if (existing[0]) throw new Error("An account with that email already exists")
+
+  // Create the user + credential account using Better Auth's own primitives so
+  // the password hash matches what sign-in expects. This works even when the
+  // public sign-up endpoint is disabled.
+  const ctx = await auth.$context
+  const hash = await ctx.password.hash(password)
+  const created = await ctx.internalAdapter.createUser(
+    { email, name, emailVerified: false },
+    { method: "email-password" },
+  )
+  if (!created) throw new Error("Could not create the account")
+
+  await ctx.internalAdapter.linkAccount({
+    userId: created.id,
+    providerId: "credential",
+    accountId: created.id,
+    password: hash,
+  })
+
+  if (role === "admin") {
+    await db.update(user).set({ role: "admin" }).where(eq(user.id, created.id))
+  }
+
+  revalidatePath("/admin")
+  return { ok: true }
 }
 
 export async function setUserRole(userId: string, role: Role) {

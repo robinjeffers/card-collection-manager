@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth"
 import { nextCookies } from "better-auth/next-js"
 import { Pool } from "pg"
+import { isPublicSignupEnabled } from "@/lib/signup"
 
 function resolveBaseURL() {
   if (process.env.BETTER_AUTH_URL) return process.env.BETTER_AUTH_URL
@@ -33,6 +34,10 @@ export const auth = betterAuth({
   trustedOrigins: resolveTrustedOrigins(),
   emailAndPassword: {
     enabled: true,
+    // When public signup is closed, block the sign-up endpoint entirely so it
+    // cannot be reached by a direct request. Admins create accounts via the
+    // server action in app/actions/admin.ts, which bypasses this.
+    disableSignUp: !isPublicSignupEnabled(),
   },
   plugins: [nextCookies()],
   ...(process.env.NODE_ENV === "development"

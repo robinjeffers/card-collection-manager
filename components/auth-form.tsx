@@ -9,7 +9,13 @@ import { signIn, signUp } from "@/lib/auth-client"
 import { Button } from "@/components/ui/button"
 import { Input, Label } from "@/components/ui/field"
 
-export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
+export function AuthForm({
+  mode,
+  allowSignup = false,
+}: {
+  mode: "sign-in" | "sign-up"
+  allowSignup?: boolean
+}) {
   const router = useRouter()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -103,15 +109,21 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         </Button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-muted-foreground">
-        {isSignUp ? "Already have an account? " : "Need an account? "}
-        <Link
-          href={isSignUp ? "/sign-in" : "/sign-up"}
-          className="font-medium text-primary underline-offset-4 hover:underline"
-        >
-          {isSignUp ? "Sign in" : "Sign up"}
-        </Link>
-      </p>
+      {isSignUp ? (
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          {"Already have an account? "}
+          <Link href="/sign-in" className="font-medium text-primary underline-offset-4 hover:underline">
+            Sign in
+          </Link>
+        </p>
+      ) : allowSignup ? (
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          {"Need an account? "}
+          <Link href="/sign-up" className="font-medium text-primary underline-offset-4 hover:underline">
+            Sign up
+          </Link>
+        </p>
+      ) : null}
     </div>
   )
 }
