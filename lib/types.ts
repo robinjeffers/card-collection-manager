@@ -23,3 +23,11 @@ export interface Collection {
   columns: Column[]
   rows: CardRow[]
 }
+
+/** Lightweight metadata for the collections home/picker screen. */
+export interface CollectionSummary {
+  id: string
+  name: string
+  cardCount: number
+  updatedAt: string | null
+}

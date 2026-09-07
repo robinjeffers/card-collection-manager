@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { CellValue, Collection, Column } from "@/lib/types"
-import { saveCollection } from "@/app/actions/collection"
+import { saveCollectionData } from "@/app/actions/collection"
 
 function uid(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`
@@ -13,7 +13,7 @@ function uid(prefix: string) {
  * server and passed in; every change is debounced and persisted to the
  * database, scoped to the current user by the server action.
  */
-export function useCollection(initial: Collection) {
+export function useCollection(initial: Collection, collectionId: string) {
   const [collection, setCollection] = useState<Collection>(initial)
   const [saving, setSaving] = useState(false)
   const firstRun = useRef(true)
@@ -28,7 +28,7 @@ export function useCollection(initial: Collection) {
     setSaving(true)
     timer.current = setTimeout(async () => {
       try {
-        await saveCollection(collection)
+        await saveCollectionData(collectionId, collection)
       } catch {
         // network/auth error — the local state is preserved and the next
         // change will retry the save.
@@ -40,7 +40,7 @@ export function useCollection(initial: Collection) {
     return () => {
       if (timer.current) clearTimeout(timer.current)
     }
-  }, [collection])
+  }, [collection, collectionId])
 
   const addColumn = useCallback((column: Omit<Column, "id">) => {
     setCollection((prev) => ({

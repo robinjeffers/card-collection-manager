@@ -56,10 +56,14 @@ export const verification = pgTable("verification", {
 
 // --- App tables ---
 
-// Each user's entire card collection is stored as one JSONB document,
-// which mirrors the client-side Collection shape (columns, tag options, rows).
+// A user can own many collections. Each collection's contents (columns, tag
+// options, rows) are stored as one JSONB document mirroring the client-side
+// Collection shape. Queries are scoped by userId (there is no RLS).
 export const collection = pgTable("collection", {
-  userId: text("userId").primaryKey(),
+  id: text("id").primaryKey(),
+  userId: text("userId").notNull(),
+  name: text("name").notNull(),
   data: jsonb("data").notNull(),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 })

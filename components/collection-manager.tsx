@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Check, Columns3, Loader2, LogOut, Plus, Search, ShieldCheck, Sparkles } from "lucide-react"
+import { ArrowLeft, Check, Columns3, Loader2, LogOut, Plus, Search, ShieldCheck } from "lucide-react"
 import { useCollection } from "@/hooks/use-collection"
 import { signOut } from "@/lib/auth-client"
 import { DataGrid } from "@/components/data-grid"
@@ -16,10 +16,14 @@ import { cn } from "@/lib/utils"
 import type { CardRow, Collection } from "@/lib/types"
 
 export function CollectionManager({
+  collectionId,
+  collectionName,
   initialCollection,
   userName,
   isAdmin = false,
 }: {
+  collectionId: string
+  collectionName: string
   initialCollection: Collection
   userName: string
   isAdmin?: boolean
@@ -35,7 +39,7 @@ export function CollectionManager({
     updateRow,
     updateCell,
     removeRow,
-  } = useCollection(initialCollection)
+  } = useCollection(initialCollection, collectionId)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [search, setSearch] = useState("")
@@ -79,11 +83,16 @@ export function CollectionManager({
     <div className="mx-auto flex min-h-svh max-w-[1600px] flex-col px-4 py-6 lg:px-8">
       <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <Sparkles className="size-5" />
-          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Back to collections"
+            onClick={() => router.push("/")}
+          >
+            <ArrowLeft className="size-5" />
+          </Button>
           <div>
-            <h1 className="text-xl font-semibold tracking-tight text-balance">Card Collection</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-balance">{collectionName}</h1>
             <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <span>
                 {collection.rows.length} card{collection.rows.length === 1 ? "" : "s"}

@@ -1,18 +1,18 @@
 import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/admin"
-import { getCollection } from "@/app/actions/collection"
-import { CollectionManager } from "@/components/collection-manager"
+import { listCollections } from "@/app/actions/collection"
+import { CollectionsHome } from "@/components/collections-home"
 
 export default async function Page() {
   const current = await getCurrentUser()
   if (!current) redirect("/sign-in")
 
-  const collection = await getCollection()
+  const collections = await listCollections()
 
   return (
     <main className="min-h-svh bg-background">
-      <CollectionManager
-        initialCollection={collection}
+      <CollectionsHome
+        collections={collections}
         userName={current.name}
         isAdmin={current.role === "admin"}
       />

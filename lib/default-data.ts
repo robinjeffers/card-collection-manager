@@ -2,6 +2,21 @@ import type { Collection } from "./types"
 
 export const DECK_TAGS = ["Consumable", "Tier 1", "Tier 2", "Tier 3", "Spells", "Unique"]
 
+/**
+ * A brand-new collection starts empty: just the two locked columns every
+ * collection needs (the card name and the artwork that drives the preview).
+ * Users add any further columns themselves.
+ */
+export function emptyCollection(): Collection {
+  return {
+    columns: [
+      { id: "name", name: "Card Name", type: "text", locked: true },
+      { id: "artwork", name: "Artwork", type: "image", locked: true, isArtwork: true },
+    ],
+    rows: [],
+  }
+}
+
 export const defaultCollection: Collection = {
   columns: [
     { id: "name", name: "Card Name", type: "text", locked: true },

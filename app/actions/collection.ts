@@ -1,12 +1,13 @@
 "use server"
 
-import { eq } from "drizzle-orm"
+import { and, asc, eq } from "drizzle-orm"
 import { headers } from "next/headers"
+import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { collection as collectionTable } from "@/lib/db/schema"
-import { defaultCollection } from "@/lib/default-data"
-import type { Collection } from "@/lib/types"
+import { emptyCollection } from "@/lib/default-data"
+import type { Collection, CollectionSummary } from "@/lib/types"
 
 async function getUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -24,11 +25,11 @@ function isCollection(value: unknown): value is Collection {
 }
 
 /**
- * Repairs collections saved by earlier versions of the app:
- * the artwork column used to be labelled "Artwork Path" and could have been
- * persisted before the upload feature existed. Ensure it is named "Artwork"
- * and typed as an image column so it renders the upload control.
- * Returns the (possibly) corrected collection plus whether anything changed.
+ * Repairs collections saved by earlier versions of the app: the artwork column
+ * used to be labelled "Artwork Path" and could have been persisted before the
+ * upload feature existed. Ensure it is named "Artwork" and typed as an image
+ * column so it renders the upload control. Returns the (possibly) corrected
+ * collection plus whether anything changed.
  */
 function normalizeCollection(data: Collection): { data: Collection; changed: boolean } {
   let changed = false
@@ -54,49 +55,98 @@ function normalizeCollection(data: Collection): { data: Collection; changed: boo
   return { data: changed ? { ...data, columns } : data, changed }
 }
 
-/**
- * Returns the signed-in user's collection, seeding the default collection
- * on first access so every account starts with the sample cards.
- */
-export async function getCollection(): Promise<Collection> {
+/** All of the signed-in user's collections, oldest first, with a card count. */
+export async function listCollections(): Promise<CollectionSummary[]> {
+  const userId = await getUserId()
+  const rows = await db
+    .select()
+    .from(collectionTable)
+    .where(eq(collectionTable.userId, userId))
+    .orderBy(asc(collectionTable.createdAt))
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    cardCount: isCollection(r.data) ? r.data.rows.length : 0,
+    updatedAt: r.updatedAt ? new Date(r.updatedAt).toISOString() : null,
+  }))
+}
+
+/** A single collection owned by the user, or null if missing / not theirs. */
+export async function getCollectionById(
+  id: string,
+): Promise<{ id: string; name: string; data: Collection } | null> {
   const userId = await getUserId()
 
   const [existing] = await db
     .select()
     .from(collectionTable)
-    .where(eq(collectionTable.userId, userId))
+    .where(and(eq(collectionTable.id, id), eq(collectionTable.userId, userId)))
     .limit(1)
 
-  if (existing && isCollection(existing.data)) {
-    const { data: normalized, changed } = normalizeCollection(existing.data)
-    if (changed) {
-      await db
-        .update(collectionTable)
-        .set({ data: normalized, updatedAt: new Date() })
-        .where(eq(collectionTable.userId, userId))
-    }
-    return normalized
+  if (!existing || !isCollection(existing.data)) return null
+
+  const { data: normalized, changed } = normalizeCollection(existing.data)
+  if (changed) {
+    await db
+      .update(collectionTable)
+      .set({ data: normalized, updatedAt: new Date() })
+      .where(and(eq(collectionTable.id, id), eq(collectionTable.userId, userId)))
   }
 
-  await db
-    .insert(collectionTable)
-    .values({ userId, data: defaultCollection })
-    .onConflictDoNothing({ target: collectionTable.userId })
-
-  return defaultCollection
+  return { id: existing.id, name: existing.name, data: normalized }
 }
 
-export async function saveCollection(data: Collection): Promise<{ ok: true }> {
+export async function createCollection(name: string): Promise<{ id: string }> {
+  const userId = await getUserId()
+  const trimmed = name.trim() || "Untitled collection"
+  const id = crypto.randomUUID()
+
+  await db.insert(collectionTable).values({
+    id,
+    userId,
+    name: trimmed,
+    data: emptyCollection(),
+  })
+
+  revalidatePath("/")
+  return { id }
+}
+
+export async function renameCollection(id: string, name: string): Promise<{ ok: true }> {
+  const userId = await getUserId()
+  const trimmed = name.trim()
+  if (!trimmed) throw new Error("Name is required")
+
+  await db
+    .update(collectionTable)
+    .set({ name: trimmed, updatedAt: new Date() })
+    .where(and(eq(collectionTable.id, id), eq(collectionTable.userId, userId)))
+
+  revalidatePath("/")
+  return { ok: true }
+}
+
+export async function deleteCollection(id: string): Promise<{ ok: true }> {
+  const userId = await getUserId()
+
+  await db
+    .delete(collectionTable)
+    .where(and(eq(collectionTable.id, id), eq(collectionTable.userId, userId)))
+
+  revalidatePath("/")
+  return { ok: true }
+}
+
+/** Persists the contents of one collection. Scoped so a user can only write their own. */
+export async function saveCollectionData(id: string, data: Collection): Promise<{ ok: true }> {
   const userId = await getUserId()
   if (!isCollection(data)) throw new Error("Invalid collection payload")
 
   await db
-    .insert(collectionTable)
-    .values({ userId, data, updatedAt: new Date() })
-    .onConflictDoUpdate({
-      target: collectionTable.userId,
-      set: { data, updatedAt: new Date() },
-    })
+    .update(collectionTable)
+    .set({ data, updatedAt: new Date() })
+    .where(and(eq(collectionTable.id, id), eq(collectionTable.userId, userId)))
 
   return { ok: true }
 }

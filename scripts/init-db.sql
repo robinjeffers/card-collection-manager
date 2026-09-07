@@ -51,7 +51,36 @@ CREATE TABLE IF NOT EXISTS "verification" (
 );
 
 CREATE TABLE IF NOT EXISTS "collection" (
-  "userId" text PRIMARY KEY,
+  "id" text PRIMARY KEY,
+  "userId" text NOT NULL,
+  "name" text NOT NULL,
   "data" jsonb NOT NULL,
+  "createdAt" timestamp NOT NULL DEFAULT now(),
   "updatedAt" timestamp NOT NULL DEFAULT now()
 );
+
+-- Upgrade path for volumes created when a user had a single collection
+-- (userId was the primary key). Adds the new columns and switches the key.
+ALTER TABLE "collection" ADD COLUMN IF NOT EXISTS "id" text;
+ALTER TABLE "collection" ADD COLUMN IF NOT EXISTS "name" text;
+ALTER TABLE "collection" ADD COLUMN IF NOT EXISTS "createdAt" timestamp NOT NULL DEFAULT now();
+UPDATE "collection" SET "id" = gen_random_uuid()::text WHERE "id" IS NULL;
+UPDATE "collection" SET "name" = 'Card Collection' WHERE "name" IS NULL;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE table_name = 'collection' AND constraint_type = 'PRIMARY KEY'
+      AND constraint_name = 'collection_pkey'
+      AND EXISTS (
+        SELECT 1 FROM information_schema.key_column_usage
+        WHERE constraint_name = 'collection_pkey' AND column_name = 'userId'
+      )
+  ) THEN
+    ALTER TABLE "collection" DROP CONSTRAINT "collection_pkey";
+    ALTER TABLE "collection" ADD PRIMARY KEY ("id");
+  END IF;
+END $$;
+ALTER TABLE "collection" ALTER COLUMN "id" SET NOT NULL;
+ALTER TABLE "collection" ALTER COLUMN "name" SET NOT NULL;
+CREATE INDEX IF NOT EXISTS "collection_userId_idx" ON "collection" ("userId");
