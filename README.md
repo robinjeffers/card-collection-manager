@@ -16,6 +16,18 @@ leave your machine.
 
 ---
 
+## Screenshots
+
+**Collections home** — every collection as a card with its banner and card count.
+
+![The collections home page showing the Card Collection Manager header and a "DSBG Treasure Deck" collection card with a banner image](./docs/screenshots/home.png)
+
+**Collection view** — a spreadsheet-style grid of cards with typed columns, tag filters, and a live artwork preview of the selected card.
+
+![The DSBG Treasure Deck collection open in the data grid, with columns for artwork, template, tags and stats, and a card preview panel on the right](./docs/screenshots/collection.png)
+
+---
+
 ## What it does
 
 At its core the app organizes **collections** of **cards**. Each collection is a table you
