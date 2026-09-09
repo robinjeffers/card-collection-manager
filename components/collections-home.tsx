@@ -71,7 +71,7 @@ export function CollectionsHome({
             <Sparkles className="size-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-balance">Your Collections</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-balance">Card Collection Manager</h1>
             <p className="text-sm text-muted-foreground">Signed in as {userName}</p>
           </div>
         </div>
