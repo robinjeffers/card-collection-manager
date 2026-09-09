@@ -60,6 +60,8 @@ shape yourself:
     with a grace period so in-progress uploads are never removed.
   - **Full backup** — download every collection and all its files as a single `.zip` (raw data
     for exact restore, plus a CSV per collection).
+  - **Restore from backup** — upload a backup `.zip` to bring collections and files back.
+    Collections are matched by ID and overwritten; anything not in the backup is left untouched.
 
 ---
 
@@ -200,7 +202,10 @@ can replace either named volume with a bind mount. The `docker-compose.yml` file
 commented instructions and an example showing exactly how.
 
 You can also download a complete archive of all collections and files at any time from the **Full
-backup** button in the `/admin` dashboard.
+backup** button in the `/admin` dashboard, and bring it back later with **Restore from backup** on
+the same page. Restore is a merge: it adds or overwrites collections by ID and rewrites their
+files, but never deletes collections that aren't in the archive — so it's safe to run against
+either a fresh instance (disaster recovery) or a live one.
 
 ---
 

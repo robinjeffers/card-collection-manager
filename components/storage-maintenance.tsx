@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useTransition } from "react"
-import { Download, HardDrive, Loader2, RefreshCw, Trash2 } from "lucide-react"
+import { useRef, useState, useTransition } from "react"
+import { Download, HardDrive, Loader2, RefreshCw, Trash2, Upload } from "lucide-react"
 import { cleanupOrphans, rescanStorage } from "@/app/actions/maintenance"
 import type { StorageCategory, StorageReport } from "@/lib/storage-report"
 import { Button } from "@/components/ui/button"
@@ -38,6 +38,46 @@ export function StorageMaintenance({ initialReport }: { initialReport: StorageRe
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [backingUp, setBackingUp] = useState(false)
+  const [restoring, setRestoring] = useState(false)
+  const [restoreFile, setRestoreFile] = useState<File | null>(null)
+  const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false)
+  const restoreInputRef = useRef<HTMLInputElement>(null)
+
+  const onPickRestoreFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null
+    e.target.value = "" // allow re-selecting the same file later
+    if (!file) return
+    setError(null)
+    setNotice(null)
+    setRestoreFile(file)
+    setRestoreConfirmOpen(true)
+  }
+
+  const doRestore = async () => {
+    if (!restoreFile) return
+    setRestoreConfirmOpen(false)
+    setError(null)
+    setNotice(null)
+    setRestoring(true)
+    try {
+      const body = new FormData()
+      body.append("backup", restoreFile)
+      const res = await fetch("/api/admin/restore", { method: "POST", body })
+      const json = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(json?.error ?? `Restore failed (${res.status})`)
+      const skipped = json.skipped?.length ? ` ${json.skipped.length} entr${json.skipped.length === 1 ? "y was" : "ies were"} skipped.` : ""
+      setNotice(
+        `Restored ${json.collectionsRestored} collection${json.collectionsRestored === 1 ? "" : "s"} and ${json.filesRestored} file${json.filesRestored === 1 ? "" : "s"} (${formatBytes(json.fileBytes)}).${skipped}`,
+      )
+      const fresh = await rescanStorage()
+      setReport(fresh)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Restore failed")
+    } finally {
+      setRestoring(false)
+      setRestoreFile(null)
+    }
+  }
 
   const downloadBackup = async () => {
     setError(null)
@@ -233,6 +273,55 @@ export function StorageMaintenance({ initialReport }: { initialReport: StorageRe
           {backingUp ? "Preparing…" : "Download backup"}
         </Button>
       </div>
+
+      <div className="mt-4 flex flex-col gap-3 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-medium">Restore from backup</h3>
+          <p className="text-sm text-muted-foreground">
+            Upload a backup zip to restore its collections and files. Collections are matched by ID
+            and overwritten; anything not in the backup is left untouched.
+          </p>
+        </div>
+        <input
+          ref={restoreInputRef}
+          type="file"
+          accept=".zip,application/zip"
+          onChange={onPickRestoreFile}
+          className="sr-only"
+        />
+        <Button
+          variant="outline"
+          onClick={() => restoreInputRef.current?.click()}
+          disabled={restoring}
+          className="shrink-0"
+        >
+          {restoring ? <Loader2 className="animate-spin" /> : <Upload />}
+          {restoring ? "Restoring…" : "Restore backup"}
+        </Button>
+      </div>
+
+      <Modal
+        open={restoreConfirmOpen}
+        onClose={() => {
+          setRestoreConfirmOpen(false)
+          setRestoreFile(null)
+        }}
+        title="Restore this backup?"
+        description={`This restores collections and files from "${restoreFile?.name ?? "the selected file"}". Collections with the same ID as ones in the backup will be overwritten. Collections not included in the backup are left as-is.`}
+      >
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setRestoreConfirmOpen(false)
+              setRestoreFile(null)
+            }}
+          >
+            Cancel
+          </Button>
+          <Button onClick={doRestore}>Restore</Button>
+        </div>
+      </Modal>
 
       <Modal
         open={confirmOpen}
