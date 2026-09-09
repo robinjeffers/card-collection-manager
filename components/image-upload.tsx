@@ -9,7 +9,7 @@ import { Modal } from "@/components/ui/modal"
 interface ImageUploadProps {
   value: string
   onChange: (url: string) => void
-  variant?: "cell" | "full"
+  variant?: "cell" | "full" | "banner"
 }
 
 export function ImageUpload({ value, onChange, variant = "cell" }: ImageUploadProps) {
@@ -91,7 +91,10 @@ export function ImageUpload({ value, onChange, variant = "cell" }: ImageUploadPr
     <input ref={inputRef} type="file" accept={ACCEPT_ATTRIBUTE} className="hidden" onChange={onPick} />
   )
 
-  if (variant === "full") {
+  if (variant === "full" || variant === "banner") {
+    const isBanner = variant === "banner"
+    const frameAspect = isBanner ? "aspect-[3/1]" : "aspect-[4/5]"
+    const imgFit = isBanner ? "object-cover" : "object-contain"
     return (
       <div>
         {hiddenInput}
@@ -99,13 +102,13 @@ export function ImageUpload({ value, onChange, variant = "cell" }: ImageUploadPr
           type="button"
           onClick={pick}
           {...dragProps}
-          className={`relative flex aspect-[4/5] w-full items-center justify-center overflow-hidden rounded-lg border border-dashed bg-muted/30 text-muted-foreground transition-colors hover:border-ring hover:text-foreground ${
+          className={`relative flex ${frameAspect} w-full items-center justify-center overflow-hidden rounded-lg border border-dashed bg-muted/30 text-muted-foreground transition-colors hover:border-ring hover:text-foreground ${
             dragActive ? "border-ring bg-primary/10 text-foreground" : "border-border"
           }`}
         >
           {value ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={value || "/placeholder.svg"} alt="" className="size-full object-contain" />
+            <img src={value || "/placeholder.svg"} alt="" className={`size-full ${imgFit}`} />
           ) : (
             <span className="flex flex-col items-center gap-2 p-6 text-center">
               <ImageIcon className="size-6" />

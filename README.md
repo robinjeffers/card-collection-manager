@@ -8,6 +8,12 @@ template file) in one place.
 It is built to run on your own hardware with Docker — your cards, images, and accounts never
 leave your machine.
 
+> ### Built entirely by AI
+>
+> Every part of this application — the code, configuration, and this documentation — was written
+> by an AI assistant (v0) in response to natural-language prompts from a human. A person directed
+> the project and reviewed the output, but no code was hand-authored.
+
 ---
 
 ## What it does

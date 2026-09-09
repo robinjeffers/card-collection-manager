@@ -2,17 +2,20 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { Download, KeyRound, Layers, LogOut, Pencil, Plus, ShieldCheck, Sparkles, Trash2 } from "lucide-react"
+import { Download, ImageIcon, KeyRound, Layers, LogOut, Pencil, Plus, ShieldCheck, Sparkles, Trash2 } from "lucide-react"
 import { signOut } from "@/lib/auth-client"
 import { ChangePasswordDialog } from "@/components/change-password-dialog"
+import { ImageUpload } from "@/components/image-upload"
 import {
   createCollection,
   deleteCollection,
   renameCollection,
+  setCollectionBanner,
 } from "@/app/actions/collection"
 import { Button } from "@/components/ui/button"
 import { Modal } from "@/components/ui/modal"
 import { Input, Label } from "@/components/ui/field"
+import { APP_VERSION } from "@/lib/version"
 import type { CollectionSummary } from "@/lib/types"
 
 export function CollectionsHome({
@@ -33,6 +36,8 @@ export function CollectionsHome({
   const [renameValue, setRenameValue] = useState("")
   const [deleting, setDeleting] = useState<CollectionSummary | null>(null)
   const [passwordOpen, setPasswordOpen] = useState(false)
+  const [bannering, setBannering] = useState<CollectionSummary | null>(null)
+  const [bannerValue, setBannerValue] = useState("")
 
   const submitCreate = () => {
     startTransition(async () => {
@@ -59,6 +64,23 @@ export function CollectionsHome({
     startTransition(async () => {
       await deleteCollection(target.id)
       setDeleting(null)
+      router.refresh()
+    })
+  }
+
+  const openBanner = (c: CollectionSummary) => {
+    setBannering(c)
+    setBannerValue(c.bannerUrl ?? "")
+  }
+
+  // Fired on every upload/remove inside the banner dialog; persists immediately
+  // so the change is reflected on the card as soon as the dialog is closed.
+  const handleBannerChange = (url: string) => {
+    if (!bannering) return
+    const target = bannering
+    setBannerValue(url)
+    startTransition(async () => {
+      await setCollectionBanner(target.id, url)
       router.refresh()
     })
   }
@@ -123,24 +145,39 @@ export function CollectionsHome({
         {collections.map((c) => (
           <div
             key={c.id}
-            className="group relative flex min-h-40 flex-col justify-between rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/60"
+            className="group relative flex min-h-44 flex-col overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary/60"
           >
             <button
               type="button"
               onClick={() => router.push(`/collections/${c.id}`)}
-              className="flex flex-1 flex-col items-start gap-3 text-left"
+              className="flex flex-1 flex-col text-left"
             >
-              <span className="flex size-10 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
-                <Layers className="size-5" />
+              <span className="relative block aspect-[3/1] w-full overflow-hidden border-b border-border">
+                {c.bannerUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={c.bannerUrl || "/placeholder.svg"} alt="" className="size-full object-cover" />
+                ) : (
+                  <span className="flex size-full items-center justify-center bg-gradient-to-br from-secondary via-secondary to-muted text-secondary-foreground/40">
+                    <Layers className="size-6" />
+                  </span>
+                )}
               </span>
-              <span className="flex flex-col gap-0.5">
+              <span className="flex flex-1 flex-col gap-0.5 p-5">
                 <span className="font-medium text-balance">{c.name}</span>
                 <span className="text-xs text-muted-foreground">
                   {c.cardCount} card{c.cardCount === 1 ? "" : "s"}
                 </span>
               </span>
             </button>
-            <div className="mt-3 flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+            <div className="absolute right-2 top-2 flex items-center gap-0.5 rounded-lg bg-background/70 p-0.5 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`Set banner for ${c.name}`}
+                onClick={() => openBanner(c)}
+              >
+                <ImageIcon className="size-4" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -175,7 +212,28 @@ export function CollectionsHome({
         ))}
       </div>
 
+      <footer className="mt-auto pt-10 text-center text-xs text-muted-foreground">
+        Card Collection Manager <span className="tabular-nums">v{APP_VERSION}</span>
+      </footer>
+
       <ChangePasswordDialog open={passwordOpen} onClose={() => setPasswordOpen(false)} />
+
+      <Modal open={!!bannering} onClose={() => setBannering(null)} title="Collection banner">
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            Upload a banner for{" "}
+            <span className="font-medium text-foreground">{bannering?.name}</span>. The ideal size
+            is <span className="font-medium text-foreground">1200 × 400 px</span> (a 3:1 ratio);
+            other sizes are cropped to fit.
+          </p>
+          <ImageUpload variant="banner" value={bannerValue} onChange={handleBannerChange} />
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setBannering(null)}>
+              Done
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="New collection">
         <div className="flex flex-col gap-4">
