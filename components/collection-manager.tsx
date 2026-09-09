@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Check, Columns3, ImagePlus, Layers, Loader2, LogOut, Plus, Search, ShieldCheck, Sheet } from "lucide-react"
+import { ArrowLeft, Check, Columns3, ImagePlus, Layers, Loader2, LogOut, Pencil, Plus, Search, ShieldCheck, Sheet, Trash2, X } from "lucide-react"
 import { useCollection } from "@/hooks/use-collection"
 import { signOut } from "@/lib/auth-client"
 import { DataGrid } from "@/components/data-grid"
@@ -12,7 +12,9 @@ import { CardFormDialog } from "@/components/card-form-dialog"
 import { ImportImagesDialog } from "@/components/import-images-dialog"
 import { ImportPairsDialog } from "@/components/import-pairs-dialog"
 import { ImportFieldsDialog } from "@/components/import-fields-dialog"
+import { BulkEditDialog } from "@/components/bulk-edit-dialog"
 import { Button } from "@/components/ui/button"
+import { Modal } from "@/components/ui/modal"
 import { fieldClass } from "@/components/ui/field"
 import { tagStyle } from "@/lib/tag-color"
 import { cn } from "@/lib/utils"
@@ -43,11 +45,16 @@ export function CollectionManager({
     addRow,
     addRows,
     updateRow,
+    updateRows,
     updateCell,
     removeRow,
+    removeRows,
   } = useCollection(initialCollection, collectionId)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
+  const [bulkEditOpen, setBulkEditOpen] = useState(false)
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [activeTags, setActiveTags] = useState<string[]>([])
   const [columnDialog, setColumnDialog] = useState(false)
@@ -79,6 +86,31 @@ export function CollectionManager({
   }, [collection.rows, search, activeTags, tagCol])
 
   const selectedRow = collection.rows.find((r) => r.id === selectedId) ?? null
+
+  // Bulk selection is keyed off row ids; deriving the rows from the live
+  // collection means deleted ids fall out automatically.
+  const checkedRows = collection.rows.filter((r) => checkedIds.has(r.id))
+  const allFilteredChecked = filteredRows.length > 0 && filteredRows.every((r) => checkedIds.has(r.id))
+
+  const toggleChecked = (id: string) => {
+    setCheckedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleCheckedAll = () => {
+    setCheckedIds((prev) => {
+      const next = new Set(prev)
+      if (allFilteredChecked) filteredRows.forEach((r) => next.delete(r.id))
+      else filteredRows.forEach((r) => next.add(r.id))
+      return next
+    })
+  }
+
+  const clearChecked = () => setCheckedIds(new Set())
 
   const openNewCard = () => {
     setEditingRow(null)
@@ -213,11 +245,36 @@ export function CollectionManager({
             ) : null}
           </div>
 
+          {checkedRows.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2">
+              <span className="text-sm font-medium">
+                {checkedRows.length} selected
+              </span>
+              <div className="ml-auto flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setBulkEditOpen(true)}>
+                  <Pencil className="size-4" />
+                  Edit
+                </Button>
+                <Button variant="destructive" size="sm" onClick={() => setBulkDeleteOpen(true)}>
+                  <Trash2 className="size-4" />
+                  Delete
+                </Button>
+                <Button variant="ghost" size="sm" onClick={clearChecked}>
+                  <X className="size-4" />
+                  Clear
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
           <DataGrid
             columns={collection.columns}
             rows={filteredRows}
             selectedId={selectedId}
+            checkedIds={checkedIds}
             onSelect={setSelectedId}
+            onToggleChecked={toggleChecked}
+            onToggleCheckedAll={toggleCheckedAll}
             onEdit={openEditCard}
             onDeleteRow={(id) => {
               removeRow(id)
@@ -279,6 +336,45 @@ export function CollectionManager({
           if (updates[0]) setSelectedId(updates[0].rowId)
         }}
       />
+      <BulkEditDialog
+        open={bulkEditOpen}
+        onClose={() => setBulkEditOpen(false)}
+        columns={collection.columns}
+        rows={checkedRows}
+        onApply={(updates, newTagOptions) => {
+          newTagOptions.forEach(({ columnId, options }) =>
+            options.forEach((option) => addTagOption(columnId, option)),
+          )
+          updateRows(updates)
+          clearChecked()
+        }}
+      />
+
+      <Modal
+        open={bulkDeleteOpen}
+        onClose={() => setBulkDeleteOpen(false)}
+        title={`Delete ${checkedRows.length} card${checkedRows.length === 1 ? "" : "s"}?`}
+        description="This permanently removes the selected cards from this collection. This can't be undone."
+      >
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setBulkDeleteOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              const ids = checkedRows.map((r) => r.id)
+              removeRows(ids)
+              if (selectedId && ids.includes(selectedId)) setSelectedId(null)
+              clearChecked()
+              setBulkDeleteOpen(false)
+            }}
+          >
+            Delete {checkedRows.length} card{checkedRows.length === 1 ? "" : "s"}
+          </Button>
+        </div>
+      </Modal>
+
       <CardFormDialog
         open={cardDialog}
         onClose={() => setCardDialog(false)}

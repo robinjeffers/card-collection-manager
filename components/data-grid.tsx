@@ -62,7 +62,10 @@ interface DataGridProps {
   columns: Column[]
   rows: CardRow[]
   selectedId: string | null
+  checkedIds: Set<string>
   onSelect: (id: string) => void
+  onToggleChecked: (id: string) => void
+  onToggleCheckedAll: () => void
   onEdit: (row: CardRow) => void
   onDeleteRow: (id: string) => void
   onDeleteColumn: (id: string) => void
@@ -76,7 +79,10 @@ export function DataGrid({
   columns,
   rows,
   selectedId,
+  checkedIds,
   onSelect,
+  onToggleChecked,
+  onToggleCheckedAll,
   onEdit,
   onDeleteRow,
   onDeleteColumn,
@@ -117,7 +123,11 @@ export function DataGrid({
   })
 
   const virtualRows = rowVirtualizer.getVirtualItems()
-  const totalColumns = columns.length + 2 // filler + actions
+  const totalColumns = columns.length + 3 // checkbox + filler + actions
+
+  const checkedInView = rows.reduce((n, r) => n + (checkedIds.has(r.id) ? 1 : 0), 0)
+  const allChecked = rows.length > 0 && checkedInView === rows.length
+  const someChecked = checkedInView > 0 && !allChecked
   const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0
   const paddingBottom =
     virtualRows.length > 0
@@ -132,6 +142,7 @@ export function DataGrid({
     >
       <table className="w-full table-fixed border-collapse text-sm">
         <colgroup>
+          <col style={{ width: "2.75rem" }} />
           {columns.map((col, i) => (
             <col key={col.id} style={{ width: `${colWidths[i]}ch` }} />
           ))}
@@ -141,6 +152,18 @@ export function DataGrid({
         </colgroup>
         <thead>
           <tr>
+            <th className="sticky top-0 z-10 bg-muted px-3 py-2.5 text-left shadow-[inset_0_-1px_0_0_var(--color-border)]">
+              <input
+                type="checkbox"
+                aria-label={allChecked ? "Deselect all cards" : "Select all cards"}
+                checked={allChecked}
+                ref={(el) => {
+                  if (el) el.indeterminate = someChecked
+                }}
+                onChange={onToggleCheckedAll}
+                className="size-4 cursor-pointer accent-primary align-middle"
+              />
+            </th>
             {columns.map((col, i) => {
               const Icon = TYPE_ICON[col.type]
               return (
@@ -209,6 +232,7 @@ export function DataGrid({
           {virtualRows.map((virtualRow) => {
             const row = rows[virtualRow.index]
             const selected = row.id === selectedId
+            const checked = checkedIds.has(row.id)
             return (
               <tr
                 key={virtualRow.key}
@@ -216,13 +240,25 @@ export function DataGrid({
                 ref={rowVirtualizer.measureElement}
                 onClick={() => onSelect(row.id)}
                 aria-selected={selected}
+                data-checked={checked}
                 className={cn(
                   "cursor-pointer border-b border-border/60 transition-colors",
                   selected
                     ? "bg-primary/10 shadow-[inset_2px_0_0_0_var(--color-primary)]"
-                    : "hover:bg-muted/40",
+                    : checked
+                      ? "bg-primary/5 hover:bg-primary/10"
+                      : "hover:bg-muted/40",
                 )}
               >
+                <td className="px-3 py-1.5 align-middle" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${String(row.values.name ?? "card")}`}
+                    checked={checked}
+                    onChange={() => onToggleChecked(row.id)}
+                    className="size-4 cursor-pointer accent-primary align-middle"
+                  />
+                </td>
                 {columns.map((col) => (
                   <td
                     key={col.id}

@@ -126,6 +126,24 @@ export function useCollection(initial: Collection, collectionId: string) {
     setCollection((prev) => ({ ...prev, rows: prev.rows.filter((r) => r.id !== rowId) }))
   }, [])
 
+  const removeRows = useCallback((rowIds: string[]) => {
+    const ids = new Set(rowIds)
+    setCollection((prev) => ({ ...prev, rows: prev.rows.filter((r) => !ids.has(r.id)) }))
+  }, [])
+
+  // Apply a batch of per-row value merges in a single state update, so bulk
+  // edits over many rows only trigger one save.
+  const updateRows = useCallback((updates: { rowId: string; values: Record<string, CellValue> }[]) => {
+    const map = new Map(updates.map((u) => [u.rowId, u.values]))
+    setCollection((prev) => ({
+      ...prev,
+      rows: prev.rows.map((r) => {
+        const values = map.get(r.id)
+        return values ? { ...r, values: { ...r.values, ...values } } : r
+      }),
+    }))
+  }, [])
+
   return {
     collection,
     saving,
@@ -137,7 +155,9 @@ export function useCollection(initial: Collection, collectionId: string) {
     addRow,
     addRows,
     updateRow,
+    updateRows,
     updateCell,
     removeRow,
+    removeRows,
   }
 }
