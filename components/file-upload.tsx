@@ -3,6 +3,7 @@
 import { useRef, useState, type ChangeEvent } from "react"
 import { Download, FileText, Loader2, Paperclip, X } from "lucide-react"
 import { TEMPLATE_ACCEPT_ATTRIBUTE, fileExtension } from "@/lib/uploads"
+import { Modal } from "@/components/ui/modal"
 
 interface FileUploadProps {
   value: string
@@ -30,6 +31,7 @@ export function FileUpload({ value, onChange, variant = "cell" }: FileUploadProp
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragActive, setDragActive] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   const name = fileNameFromUrl(value)
 
@@ -51,6 +53,7 @@ export function FileUpload({ value, onChange, variant = "cell" }: FileUploadProp
       }
       const { url } = (await res.json()) as { url: string }
       onChange(url)
+      setPickerOpen(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed")
     } finally {
@@ -67,6 +70,12 @@ export function FileUpload({ value, onChange, variant = "cell" }: FileUploadProp
   const pick = (e: React.MouseEvent) => {
     e.stopPropagation()
     inputRef.current?.click()
+  }
+
+  const openPicker = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setError(null)
+    setPickerOpen(true)
   }
 
   const onDragOver = (e: React.DragEvent) => {
@@ -147,58 +156,97 @@ export function FileUpload({ value, onChange, variant = "cell" }: FileUploadProp
   }
 
   return (
-    <div className="flex items-center gap-2" {...dragProps}>
-      {hiddenInput}
-      <div
-        className={`flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted transition-colors ${
-          dragActive ? "border-ring ring-2 ring-ring/40" : "border-border"
-        }`}
-      >
-        {uploading ? (
-          <Loader2 className="size-4 animate-spin text-muted-foreground" />
-        ) : value ? (
-          <FileText className="size-4 text-muted-foreground" />
-        ) : (
-          <Paperclip className="size-4 text-muted-foreground" />
-        )}
-      </div>
-      <div className="flex min-w-0 flex-col leading-tight">
-        {value && !uploading ? (
-          <>
-            <a
-              href={value}
-              download={name}
-              onClick={(e) => e.stopPropagation()}
-              className="truncate text-left text-sm text-foreground hover:underline"
-              title={name}
-            >
-              {name}
-            </a>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={pick} className="text-left text-xs text-muted-foreground hover:text-foreground">
-                Replace
-              </button>
-              <button
-                type="button"
-                onClick={remove}
-                className="inline-flex items-center text-xs text-muted-foreground/70 hover:text-destructive"
-                aria-label="Remove file"
+    <>
+      <div className="flex items-center gap-2" {...dragProps}>
+        {hiddenInput}
+        <div
+          className={`flex size-9 shrink-0 items-center justify-center rounded-md border bg-muted transition-colors ${
+            dragActive ? "border-ring ring-2 ring-ring/40" : "border-border"
+          }`}
+        >
+          {uploading ? (
+            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+          ) : value ? (
+            <FileText className="size-4 text-muted-foreground" />
+          ) : (
+            <Paperclip className="size-4 text-muted-foreground" />
+          )}
+        </div>
+        <div className="flex min-w-0 flex-col leading-tight">
+          {value && !uploading ? (
+            <>
+              <a
+                href={value}
+                download={name}
+                onClick={(e) => e.stopPropagation()}
+                className="truncate text-left text-sm text-foreground hover:underline"
+                title={name}
               >
-                <X className="size-3.5" />
-              </button>
-            </div>
-          </>
-        ) : (
-          <button
-            type="button"
-            onClick={pick}
-            className="text-left text-sm text-muted-foreground hover:text-foreground"
-          >
-            {uploading ? "Uploading…" : "Upload"}
-          </button>
-        )}
-        {error ? <span className="text-xs text-destructive">{error}</span> : null}
+                {name}
+              </a>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={openPicker}
+                  className="text-left text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Replace
+                </button>
+                <button
+                  type="button"
+                  onClick={remove}
+                  className="inline-flex items-center text-xs text-muted-foreground/70 hover:text-destructive"
+                  aria-label="Remove file"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={openPicker}
+              className="text-left text-sm text-muted-foreground hover:text-foreground"
+            >
+              {uploading ? "Uploading…" : "Upload"}
+            </button>
+          )}
+          {error && !pickerOpen ? <span className="text-xs text-destructive">{error}</span> : null}
+        </div>
       </div>
-    </div>
+
+      <Modal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title={value ? "Replace template file" : "Upload template file"}
+      >
+        {value ? (
+          <div className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
+            <FileText className="size-5 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate text-sm" title={name}>
+              {name}
+            </span>
+          </div>
+        ) : null}
+        <button
+          type="button"
+          onClick={pick}
+          {...dragProps}
+          className={`flex w-full items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-sm text-muted-foreground transition-colors hover:border-ring hover:text-foreground ${
+            dragActive ? "border-ring bg-primary/10 text-foreground" : "border-border"
+          }`}
+        >
+          {uploading ? <Loader2 className="size-4 animate-spin" /> : <Paperclip className="size-4" />}
+          {uploading
+            ? "Uploading…"
+            : dragActive
+              ? "Drop file to upload"
+              : value
+                ? "Click or drag a file to replace"
+                : "Click or drag a template file"}
+        </button>
+        {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
+      </Modal>
+    </>
   )
 }
