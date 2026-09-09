@@ -28,15 +28,17 @@ function isCollection(value: unknown): value is Collection {
 }
 
 /**
- * Repairs collections saved by earlier versions of the app: the artwork column
- * used to be labelled "Artwork Path" and could have been persisted before the
- * upload feature existed. Ensure it is named "Artwork" and typed as an image
- * column so it renders the upload control. Returns the (possibly) corrected
- * collection plus whether anything changed.
+ * Repairs collections saved by earlier versions of the app:
+ *  - the artwork column used to be labelled "Artwork Path" and could have been
+ *    persisted before the upload feature existed, so ensure it is named
+ *    "Artwork" and typed as an image column;
+ *  - every collection should have the locked "Template" file column, so
+ *    back-fill it (just after Artwork) when it's missing.
+ * Returns the (possibly) corrected collection plus whether anything changed.
  */
 function normalizeCollection(data: Collection): { data: Collection; changed: boolean } {
   let changed = false
-  const columns = data.columns.map((col) => {
+  let columns = data.columns.map((col) => {
     if (col.isArtwork || col.id === "artwork") {
       const fixed = { ...col }
       if (fixed.name === "Artwork Path") {
@@ -55,6 +57,19 @@ function normalizeCollection(data: Collection): { data: Collection; changed: boo
     }
     return col
   })
+
+  if (!columns.some((c) => c.id === "template")) {
+    const templateCol: Collection["columns"][number] = {
+      id: "template",
+      name: "Template",
+      type: "file",
+      locked: true,
+    }
+    const artIdx = columns.findIndex((c) => c.isArtwork || c.id === "artwork")
+    columns = artIdx >= 0 ? [...columns.slice(0, artIdx + 1), templateCol, ...columns.slice(artIdx + 1)] : [...columns, templateCol]
+    changed = true
+  }
+
   return { data: changed ? { ...data, columns } : data, changed }
 }
 

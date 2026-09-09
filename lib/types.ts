@@ -1,4 +1,4 @@
-export type ColumnType = "text" | "number" | "tag" | "image"
+export type ColumnType = "text" | "number" | "tag" | "image" | "file"
 
 export interface Column {
   id: string

@@ -1,9 +1,10 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { GripVertical, Hash, ImageIcon, Lock, Pencil, Tag, Trash2, Type } from "lucide-react"
+import { GripVertical, Hash, ImageIcon, Lock, Paperclip, Pencil, Tag, Trash2, Type } from "lucide-react"
 import { TagInput } from "@/components/tag-input"
 import { ImageUpload } from "@/components/image-upload"
+import { FileUpload } from "@/components/file-upload"
 import { tagStyle } from "@/lib/tag-color"
 import { cn } from "@/lib/utils"
 import type { CardRow, CellValue, Column } from "@/lib/types"
@@ -13,6 +14,7 @@ const TYPE_ICON = {
   number: Hash,
   tag: Tag,
   image: ImageIcon,
+  file: Paperclip,
 } as const
 
 interface DataGridProps {
@@ -213,6 +215,10 @@ function GridCell({ column, value, onChange, onCreateTagOption, onDeleteTagOptio
 
   if (column.type === "image") {
     return <ImageUpload value={String(value ?? "")} onChange={(url) => onChange(url)} />
+  }
+
+  if (column.type === "file") {
+    return <FileUpload value={String(value ?? "")} onChange={(url) => onChange(url)} />
   }
 
   if (column.type === "number") {
