@@ -124,7 +124,7 @@ export function CollectionManager({
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setColumnDialog(true)}>
             <Columns3 />
-            Add column
+            Add Column
           </Button>
           {artworkCol ? (
             <Button variant="outline" onClick={() => setImportDialog(true)}>
@@ -140,7 +140,7 @@ export function CollectionManager({
           ) : null}
           <Button onClick={openNewCard}>
             <Plus />
-            New card
+            New Card
           </Button>
           {isAdmin ? (
             <Button variant="outline" onClick={() => router.push("/admin")}>
