@@ -17,6 +17,12 @@ export const MAX_IMAGE_BYTES = 8 * 1024 * 1024 // 8 MB
  */
 export const MAX_TEMPLATE_BYTES = 100 * 1024 * 1024 // 100 MB
 
+/** Size cap for the small, client-generated grid thumbnail stored beside an image. */
+export const MAX_THUMBNAIL_BYTES = 1 * 1024 * 1024 // 1 MB
+
+/** Suffix + extension for the thumbnail stored beside a full image (`<id>.thumb.webp`). */
+export const THUMBNAIL_SUFFIX = ".thumb.webp"
+
 /** Allowed image upload MIME types mapped to the extension we store them under. */
 export const MIME_EXTENSIONS: Record<string, string> = {
   "image/png": "png",
@@ -80,4 +86,21 @@ export function sanitizeUploadName(filename: string): string {
     .trim()
     .slice(0, 120)
   return cleaned || "file"
+}
+
+/**
+ * Given a full-image URL we produced (`/api/uploads/<uid>/<uuid>.<ext>`), return
+ * the conventional thumbnail URL stored beside it. Returns null for URLs we
+ * don't own (e.g. external images) or that have no extension. The thumbnail may
+ * not exist for older uploads, so callers must fall back to the full image if
+ * it 404s.
+ */
+export function thumbnailUrl(fullUrl: string): string | null {
+  if (!fullUrl.startsWith("/api/uploads/")) return null
+  const slash = fullUrl.lastIndexOf("/")
+  const dir = fullUrl.slice(0, slash + 1)
+  const file = fullUrl.slice(slash + 1)
+  const dot = file.lastIndexOf(".")
+  if (dot <= 0) return null
+  return `${dir}${file.slice(0, dot)}${THUMBNAIL_SUFFIX}`
 }

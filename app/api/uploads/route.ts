@@ -7,8 +7,10 @@ import { auth } from "@/lib/auth"
 import {
   MAX_IMAGE_BYTES,
   MAX_TEMPLATE_BYTES,
+  MAX_THUMBNAIL_BYTES,
   MIME_EXTENSIONS,
   TEMPLATE_EXTENSION_MIME,
+  THUMBNAIL_SUFFIX,
   UPLOAD_DIR,
   fileExtension,
   sanitizeUploadName,
@@ -70,8 +72,22 @@ export async function POST(request: Request) {
   // enforce ownership just from the URL path.
   await mkdir(userRoot, { recursive: true })
 
-  const filename = `${randomUUID()}.${ext}`
+  const id = randomUUID()
+  const filename = `${id}.${ext}`
   await writeFile(path.join(userRoot, filename), bytes)
+
+  // Optional client-generated thumbnail, stored beside the original as
+  // `<id>.thumb.webp`. The grid uses it for fast, low-memory rendering; a
+  // missing/invalid one is non-fatal since the grid falls back to the full image.
+  const thumb = form.get("thumbnail")
+  if (thumb instanceof File && thumb.type === "image/webp" && thumb.size > 0 && thumb.size <= MAX_THUMBNAIL_BYTES) {
+    try {
+      const thumbBytes = Buffer.from(await thumb.arrayBuffer())
+      await writeFile(path.join(userRoot, `${id}${THUMBNAIL_SUFFIX}`), thumbBytes)
+    } catch {
+      // ignore — thumbnail is a pure optimization
+    }
+  }
 
   return NextResponse.json({ url: `/api/uploads/${session.user.id}/${filename}` })
 }

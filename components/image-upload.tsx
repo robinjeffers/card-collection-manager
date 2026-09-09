@@ -2,7 +2,8 @@
 
 import { useRef, useState, type ChangeEvent } from "react"
 import { ImageIcon, Loader2, Upload } from "lucide-react"
-import { ACCEPT_ATTRIBUTE } from "@/lib/uploads"
+import { ACCEPT_ATTRIBUTE, thumbnailUrl } from "@/lib/uploads"
+import { createThumbnailBlob } from "@/lib/image-thumbnail"
 import { Modal } from "@/components/ui/modal"
 
 interface ImageUploadProps {
@@ -24,6 +25,8 @@ export function ImageUpload({ value, onChange, variant = "cell" }: ImageUploadPr
     try {
       const body = new FormData()
       body.append("file", file)
+      const thumb = await createThumbnailBlob(file)
+      if (thumb) body.append("thumbnail", new File([thumb], "thumb.webp", { type: "image/webp" }))
       const res = await fetch("/api/uploads", { method: "POST", body })
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string }
@@ -152,8 +155,7 @@ export function ImageUpload({ value, onChange, variant = "cell" }: ImageUploadPr
           }`}
         >
           {value ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={value || "/placeholder.svg"} alt="" className="size-full object-cover" />
+            <GridThumb src={value} />
           ) : (
             <span className="flex size-full items-center justify-center text-muted-foreground">
               <Upload className="size-4" />
@@ -227,5 +229,31 @@ export function ImageUpload({ value, onChange, variant = "cell" }: ImageUploadPr
         {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
       </Modal>
     </>
+  )
+}
+
+/**
+ * Small grid preview image. Loads the lightweight thumbnail when one exists and
+ * lazily (only when scrolled into view), falling back to the full image for
+ * older uploads that predate thumbnails or external URLs.
+ */
+function GridThumb({ src }: { src: string }) {
+  const thumb = thumbnailUrl(src)
+  const [thumbFailed, setThumbFailed] = useState(false)
+  const shown = thumb && !thumbFailed ? thumb : src
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={shown || "/placeholder.svg"}
+      alt=""
+      className="size-full object-cover"
+      loading="lazy"
+      decoding="async"
+      width={72}
+      height={72}
+      onError={() => {
+        if (thumb && !thumbFailed) setThumbFailed(true)
+      }}
+    />
   )
 }

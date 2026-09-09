@@ -12,6 +12,7 @@ import {
   TEMPLATE_EXTENSION_MIME,
   fileExtension,
 } from "@/lib/uploads"
+import { createThumbnailBlob } from "@/lib/image-thumbnail"
 
 interface ImportPairsDialogProps {
   open: boolean
@@ -136,7 +137,12 @@ export function ImportPairsDialog({ open, onClose, onImport }: ImportPairsDialog
   async function uploadFile(file: File, kind: "image" | "file"): Promise<string> {
     const body = new FormData()
     body.append("file", file)
-    if (kind === "file") body.append("kind", "file")
+    if (kind === "file") {
+      body.append("kind", "file")
+    } else {
+      const thumb = await createThumbnailBlob(file)
+      if (thumb) body.append("thumbnail", new File([thumb], "thumb.webp", { type: "image/webp" }))
+    }
     const res = await fetch("/api/uploads", { method: "POST", body })
     if (!res.ok) {
       const data = (await res.json().catch(() => ({}))) as { error?: string }
