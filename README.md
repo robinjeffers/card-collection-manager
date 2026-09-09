@@ -112,12 +112,34 @@ You do **not** need Node.js, pnpm, or PostgreSQL installed on the host.
 
 ## Getting started
 
-### 1. Clone the repository
+### 1. Get the code
+
+Pick **one** of the two options below.
+
+**Option A — Clone with Git** (recommended; makes pulling future updates easy):
 
 ```bash
 git clone https://github.com/robinjeffers/card-collection-manager.git
 cd card-collection-manager
 ```
+
+**Option B — Download as a ZIP** (no Git required):
+
+1. Open the repository page: <https://github.com/robinjeffers/card-collection-manager>
+2. Click the green **`< > Code`** button, then choose **Download ZIP**.
+3. Unzip the downloaded file. It extracts to a folder named `card-collection-manager-main`
+   (GitHub appends the branch name) — rename it to `card-collection-manager` if you like.
+4. Open a terminal **inside that folder** — this is where you'll run the Docker commands in the
+   later steps. On Windows you can right-click the folder and choose *"Open in Terminal"*; on
+   macOS/Linux, `cd` into it.
+
+> The ZIP contains the exact same files as a clone, minus the hidden `.git` folder — so everything
+> below works identically. The only trade-off is that you'll download a fresh ZIP each time you
+> want to update, whereas a clone can pull updates with `git pull`.
+
+> Hidden files: the project relies on files that begin with a dot (for example `.env.example`). If
+> you don't see them in your file manager, enable "show hidden files" (Windows Explorer: **View →
+> Show → Hidden items**; macOS Finder: press **⌘ + Shift + .**).
 
 ### 2. Create your `.env`
 
