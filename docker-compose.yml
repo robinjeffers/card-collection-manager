@@ -53,6 +53,32 @@ services:
     ports:
       - "3000:3000"
 
+# Persistent storage for the app. By default these are Docker-managed named
+# volumes (kept under Docker's own storage area and preserved across
+# `docker compose down` / restarts / image rebuilds).
+#
+# This is the location for all persistent data:
+#   - db-data      -> database metadata: collections, columns, tags, and the
+#                     text/number values on each card (Postgres data directory).
+#   - uploads-data -> card artwork, generated grid thumbnails (.thumb.webp),
+#                     and uploaded template files (mapped to UPLOAD_DIR above).
+#
+# To store this data at a specific location on the host instead (so you can
+# browse or back it up directly), replace the named volume with a bind mount of
+# the form `HOST_PATH:CONTAINER_PATH`, changing ONLY the host (left) side.
+# Point the two mounts under one folder, for example:
+#
+#   services:
+#     db:
+#       volumes:
+#         - /your/host/path/db:/var/lib/postgresql/data
+#     app:
+#       volumes:
+#         - /your/host/path/uploads:/data/uploads
+#
+# The container (right) paths must stay as shown so they match the app's
+# UPLOAD_DIR and the Postgres data directory. When bind-mounting every volume,
+# this bottom `volumes:` block can be removed entirely.
 volumes:
   db-data:
   uploads-data:
