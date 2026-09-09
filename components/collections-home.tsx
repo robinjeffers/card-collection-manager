@@ -2,9 +2,8 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { Download, KeyRound, Layers, LogOut, Pencil, Plus, ShieldCheck, Sparkles, Trash2 } from "lucide-react"
+import { Download, Layers, LogOut, Pencil, Plus, ShieldCheck, Sparkles, Trash2 } from "lucide-react"
 import { signOut } from "@/lib/auth-client"
-import { ChangePasswordDialog } from "@/components/change-password-dialog"
 import {
   createCollection,
   deleteCollection,
@@ -32,7 +31,6 @@ export function CollectionsHome({
   const [renaming, setRenaming] = useState<CollectionSummary | null>(null)
   const [renameValue, setRenameValue] = useState("")
   const [deleting, setDeleting] = useState<CollectionSummary | null>(null)
-  const [passwordOpen, setPasswordOpen] = useState(false)
 
   const submitCreate = () => {
     startTransition(async () => {
@@ -82,14 +80,6 @@ export function CollectionsHome({
               Admin
             </Button>
           ) : null}
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Update password"
-            onClick={() => setPasswordOpen(true)}
-          >
-            <KeyRound className="size-4" />
-          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -174,8 +164,6 @@ export function CollectionsHome({
           </div>
         ))}
       </div>
-
-      <ChangePasswordDialog open={passwordOpen} onClose={() => setPasswordOpen(false)} />
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="New collection">
         <div className="flex flex-col gap-4">
