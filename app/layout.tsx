@@ -9,7 +9,7 @@ const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono'
 
 export const metadata: Metadata = {
   title: 'Card Collection Manager',
-  description: 'Organize your trading card collection with custom columns, tags, and live artwork previews.',
+  description: 'Organize your card collection with custom columns, tags, and live artwork previews.',
   generator: 'v0.app',
 }
 

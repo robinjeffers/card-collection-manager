@@ -1,6 +1,6 @@
 # Card Collection Manager
 
-A self-hosted web app for cataloging and designing trading-card collections. It pairs a
+A self-hosted web app for cataloging and designing card collections. It pairs a
 spreadsheet-style data grid with live artwork previews, so you can manage the *data* behind
 each card (name, stats, tags) and the *assets* for each card (artwork image, print-ready
 template file) in one place.
@@ -52,7 +52,7 @@ shape yourself:
 
 - **Email + password authentication** via [Better Auth](https://www.better-auth.com/), with
   secure password hashing and session management.
-- **Invite-only by default** — admins create accounts; public self-service signup is opt-in.
+- **Invite-only** — admins create every account; there is no public self-service signup.
 - **Admin dashboard** at `/admin` for account management plus self-hosting maintenance tools:
   - **Storage usage view** — a breakdown of disk usage by category (artwork, thumbnails,
     templates) and by user.
@@ -97,19 +97,8 @@ cd card-collection-manager
 
 ### 2. Create your `.env`
 
-The repo ships a fully documented `.env.example`. Copy it to `.env`:
-
-```bash
-# macOS / Linux
-cp .env.example .env
-```
-
-```powershell
-# Windows PowerShell
-Copy-Item .env.example .env
-```
-
-Then open `.env` and fill in the values described below.
+The repo ships a fully documented `.env.example`. Copy it to a new file named `.env`, then open
+`.env` and fill in the values described below.
 
 ### 3. Generate a `BETTER_AUTH_SECRET`
 
@@ -141,7 +130,7 @@ BETTER_AUTH_SECRET=the-value-you-just-generated
 openssl rand -base64 32
 ```
 
-### 4. Set the remaining required values
+### 4. Set the remaining values and create your first account
 
 In `.env`, at minimum:
 
@@ -151,29 +140,19 @@ In `.env`, at minimum:
   expose the app on another hostname (e.g. a Cloudflare Tunnel). Use the exact scheme + host with
   **no trailing slash**.
 
-### 5. Choose how you get your first account
+The app is **invite-only** — admins create every account. To create your first admin, uncomment
+and set the bootstrap values so the account is created automatically on first boot:
 
-The app is **invite-only by default** (`ALLOW_PUBLIC_SIGNUP=false`), so pick one approach in
-`.env`:
-
-- **Recommended — bootstrap an admin on first boot.** Uncomment and set:
-
-  ```
-  INITIAL_ADMIN_EMAIL=you@example.com
-  INITIAL_ADMIN_PASSWORD=your-strong-password   # at least 8 characters
-  INITIAL_ADMIN_NAME=Your Name
-  ```
-
-  On the first startup, the app creates this account as an admin automatically, so you can keep
-  signup closed from day one.
-
-- **Or open public signup** by setting `ALLOW_PUBLIC_SIGNUP=true`, registering an account, then
-  optionally turning it back off.
+```
+INITIAL_ADMIN_EMAIL=you@example.com
+INITIAL_ADMIN_PASSWORD=your-strong-password   # at least 8 characters
+INITIAL_ADMIN_NAME=Your Name
+```
 
 Optionally set `ADMIN_EMAILS=you@example.com` so that account always has admin rights — this is
 what unlocks the `/admin` dashboard (storage tools and full backup). It survives database resets.
 
-### 6. Start the app
+### 5. Start the app
 
 ```bash
 docker compose up -d --build
@@ -189,9 +168,9 @@ On startup, Docker automatically:
 
 The first build takes a few minutes. Subsequent starts take seconds.
 
-### 7. Sign in
+### 6. Sign in
 
-Open **http://localhost:3000** and sign in with your admin credentials from step 5.
+Open **http://localhost:3000** and sign in with your admin credentials from step 4.
 
 ---
 
@@ -240,7 +219,6 @@ option in detail; the most important are:
 | `DATABASE_URL`          | No       | Point at an external Postgres instead of the bundled one.              |
 | `UPLOAD_DIR`            | No       | Where uploads are stored inside the container (default `/data/uploads`).|
 | `ADMIN_EMAILS`          | No       | Comma-separated emails auto-granted admin access.                      |
-| `ALLOW_PUBLIC_SIGNUP`   | No       | `true` to allow self-service signup. Defaults to invite-only.          |
 | `INITIAL_ADMIN_EMAIL`   | No       | Bootstraps an admin account on first boot.                             |
 | `INITIAL_ADMIN_PASSWORD`| No       | Password for the bootstrapped admin (min 8 characters).                |
 | `INITIAL_ADMIN_NAME`    | No       | Display name for the bootstrapped admin.                               |
