@@ -15,6 +15,7 @@ import { ImportFieldsDialog } from "@/components/import-fields-dialog"
 import { BulkEditDialog } from "@/components/bulk-edit-dialog"
 import { Button } from "@/components/ui/button"
 import { Modal } from "@/components/ui/modal"
+import { useToast } from "@/components/ui/toast"
 import { fieldClass } from "@/components/ui/field"
 import { tagStyle } from "@/lib/tag-color"
 import { cn } from "@/lib/utils"
@@ -49,7 +50,10 @@ export function CollectionManager({
     updateCell,
     removeRow,
     removeRows,
+    restore,
   } = useCollection(initialCollection, collectionId)
+
+  const { toast } = useToast()
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
@@ -277,14 +281,38 @@ export function CollectionManager({
             onToggleCheckedAll={toggleCheckedAll}
             onEdit={openEditCard}
             onDeleteRow={(id) => {
+              const snapshot = collection
+              const name = String(collection.rows.find((r) => r.id === id)?.values.name ?? "card")
               removeRow(id)
               if (selectedId === id) setSelectedId(null)
+              toast({
+                message: `Deleted "${name}"`,
+                actionLabel: "Undo",
+                onAction: () => restore(snapshot),
+              })
             }}
-            onDeleteColumn={removeColumn}
+            onDeleteColumn={(id) => {
+              const snapshot = collection
+              const name = collection.columns.find((c) => c.id === id)?.name ?? "column"
+              removeColumn(id)
+              toast({
+                message: `Deleted column "${name}"`,
+                actionLabel: "Undo",
+                onAction: () => restore(snapshot),
+              })
+            }}
             onReorderColumns={reorderColumns}
             onUpdateCell={updateCell}
             onCreateTagOption={addTagOption}
-            onDeleteTagOption={removeTagOption}
+            onDeleteTagOption={(columnId, option) => {
+              const snapshot = collection
+              removeTagOption(columnId, option)
+              toast({
+                message: `Deleted tag "${option}"`,
+                actionLabel: "Undo",
+                onAction: () => restore(snapshot),
+              })
+            }}
           />
         </div>
 
@@ -363,11 +391,18 @@ export function CollectionManager({
           <Button
             variant="destructive"
             onClick={() => {
+              const snapshot = collection
               const ids = checkedRows.map((r) => r.id)
+              const count = ids.length
               removeRows(ids)
               if (selectedId && ids.includes(selectedId)) setSelectedId(null)
               clearChecked()
               setBulkDeleteOpen(false)
+              toast({
+                message: `Deleted ${count} card${count === 1 ? "" : "s"}`,
+                actionLabel: "Undo",
+                onAction: () => restore(snapshot),
+              })
             }}
           >
             Delete {checkedRows.length} card{checkedRows.length === 1 ? "" : "s"}
