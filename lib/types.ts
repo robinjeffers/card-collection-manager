@@ -1,4 +1,4 @@
-export type ColumnType = "text" | "number" | "tag" | "image"
+export type ColumnType = "text" | "number" | "tag" | "image" | "file"
 
 export interface Column {
   id: string
@@ -22,6 +22,8 @@ export interface CardRow {
 export interface Collection {
   columns: Column[]
   rows: CardRow[]
+  /** Optional banner image URL shown on the collection's home card. */
+  banner?: string
 }
 
 /** Lightweight metadata for the collections home/picker screen. */
@@ -29,5 +31,6 @@ export interface CollectionSummary {
   id: string
   name: string
   cardCount: number
+  bannerUrl: string | null
   updatedAt: string | null
 }

@@ -70,12 +70,20 @@ function resolveUpload(ref: string): { abs: string; base: string } | null {
   return { abs, base: path.basename(abs) }
 }
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) {
     return new NextResponse("Unauthorized", { status: 401 })
   }
   const { id } = await params
+
+  // Media inclusion is opt-out via query params: absent means include. Only an
+  // explicit "0"/"false" excludes that category. Non-media data (JSON + CSV) is
+  // always exported regardless of these flags.
+  const { searchParams } = new URL(request.url)
+  const isFalsey = (v: string | null) => v === "0" || v === "false"
+  const includeArtwork = !isFalsey(searchParams.get("artwork"))
+  const includeTemplates = !isFalsey(searchParams.get("templates"))
 
   const [row] = await db
     .select()
@@ -89,6 +97,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const source = row.data
   const imageColumnIds = new Set(source.columns.filter((c) => c.type === "image").map((c) => c.id))
+  const fileColumnIds = new Set(source.columns.filter((c) => c.type === "file").map((c) => c.id))
 
   // The column holding each card's name — used to name the exported image files.
   const nameColId =
@@ -96,46 +105,61 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     source.columns.find((c) => c.type === "text")?.id ??
     source.columns[0]?.id
 
-  // Walk the rows once: rewrite each in-app image reference to a relative
-  // `images/<Card Name>.<ext>` path and collect the disk paths to read.
-  // Exported filenames are derived from the card name and de-duplicated so
-  // repeated or empty names never collide.
-  const toRead: { filename: string; abs: string }[] = []
-  const usedNames = new Set<string>()
+  // Walk the rows once: for each included media reference, rewrite the in-app
+  // upload path to a relative `<folder>/<Card Name>.<ext>` path and collect the
+  // disk path to read. Excluded categories keep their original reference so the
+  // data stays intact. Filenames are derived from the card name and
+  // de-duplicated per folder so repeated or empty names never collide.
+  const toRead: { folder: string; filename: string; abs: string }[] = []
+  const usedNamesByFolder = new Map<string, Set<string>>()
 
-  const uniqueImageName = (cardName: string, ext: string) => {
+  const uniqueName = (folder: string, cardName: string, ext: string) => {
+    let used = usedNamesByFolder.get(folder)
+    if (!used) {
+      used = new Set<string>()
+      usedNamesByFolder.set(folder, used)
+    }
     const base = sanitizeFileName(cardName) || "card"
     let candidate = `${base}${ext}`
     let n = 2
-    while (usedNames.has(candidate.toLowerCase())) {
+    while (used.has(candidate.toLowerCase())) {
       candidate = `${base}-${n}${ext}`
       n += 1
     }
-    usedNames.add(candidate.toLowerCase())
+    used.add(candidate.toLowerCase())
     return candidate
+  }
+
+  // folder each media column maps to inside the archive, or null if excluded.
+  const folderFor = (colId: string): string | null => {
+    if (imageColumnIds.has(colId)) return includeArtwork ? "images" : null
+    if (fileColumnIds.has(colId)) return includeTemplates ? "templates" : null
+    return null
   }
 
   const rows: CardRow[] = source.rows.map((r) => {
     const values = { ...r.values }
     const cardName = nameColId ? cellToText(r.values[nameColId]) : ""
-    for (const colId of imageColumnIds) {
+    for (const colId of [...imageColumnIds, ...fileColumnIds]) {
+      const folder = folderFor(colId)
+      if (!folder) continue // category excluded — leave the reference untouched
       const ref = values[colId]
       if (typeof ref !== "string" || !ref) continue
       const resolved = resolveUpload(ref)
       if (!resolved) continue // external URL or invalid — leave untouched
-      const filename = uniqueImageName(cardName, path.extname(resolved.base))
-      values[colId] = `images/${filename}`
-      toRead.push({ filename, abs: resolved.abs })
+      const filename = uniqueName(folder, cardName, path.extname(resolved.base))
+      values[colId] = `${folder}/${filename}`
+      toRead.push({ folder, filename, abs: resolved.abs })
     }
     return { ...r, values }
   })
 
-  // Read the actual bytes for each referenced image.
+  // Read the actual bytes for each referenced media file.
   const zipEntries: Record<string, Uint8Array> = {}
-  for (const { filename, abs } of toRead) {
+  for (const { folder, filename, abs } of toRead) {
     try {
       const data = await readFile(abs)
-      zipEntries[`images/${filename}`] = new Uint8Array(data)
+      zipEntries[`${folder}/${filename}`] = new Uint8Array(data)
     } catch {
       // Skip missing files rather than failing the whole export.
     }
@@ -146,6 +170,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     version: 1,
     exportedAt: new Date().toISOString(),
     name: row.name,
+    includes: { artwork: includeArtwork, templates: includeTemplates },
     collection: { columns: source.columns, rows } satisfies Collection,
   }
 

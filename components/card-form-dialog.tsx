@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input, Label } from "@/components/ui/field"
 import { TagInput } from "@/components/tag-input"
 import { ImageUpload } from "@/components/image-upload"
+import { FileUpload } from "@/components/file-upload"
 import type { CardRow, CellValue, Column } from "@/lib/types"
 
 interface CardFormDialogProps {
@@ -79,6 +80,12 @@ export function CardFormDialog({
               />
             ) : col.type === "image" ? (
               <ImageUpload
+                value={String(values[col.id] ?? "")}
+                onChange={(url) => setValue(col.id, url)}
+                variant="full"
+              />
+            ) : col.type === "file" ? (
+              <FileUpload
                 value={String(values[col.id] ?? "")}
                 onChange={(url) => setValue(col.id, url)}
                 variant="full"

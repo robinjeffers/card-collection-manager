@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Check, Columns3, ImagePlus, Loader2, LogOut, Plus, Search, ShieldCheck } from "lucide-react"
+import { ArrowLeft, Check, Columns3, ImagePlus, Layers, Loader2, LogOut, Pencil, Plus, Search, ShieldCheck, Sheet, Trash2, X } from "lucide-react"
 import { useCollection } from "@/hooks/use-collection"
 import { signOut } from "@/lib/auth-client"
 import { DataGrid } from "@/components/data-grid"
@@ -10,7 +10,12 @@ import { ImagePreview } from "@/components/image-preview"
 import { AddColumnDialog } from "@/components/add-column-dialog"
 import { CardFormDialog } from "@/components/card-form-dialog"
 import { ImportImagesDialog } from "@/components/import-images-dialog"
+import { ImportPairsDialog } from "@/components/import-pairs-dialog"
+import { ImportFieldsDialog } from "@/components/import-fields-dialog"
+import { BulkEditDialog } from "@/components/bulk-edit-dialog"
 import { Button } from "@/components/ui/button"
+import { Modal } from "@/components/ui/modal"
+import { useToast } from "@/components/ui/toast"
 import { fieldClass } from "@/components/ui/field"
 import { tagStyle } from "@/lib/tag-color"
 import { cn } from "@/lib/utils"
@@ -41,21 +46,36 @@ export function CollectionManager({
     addRow,
     addRows,
     updateRow,
+    updateRows,
     updateCell,
     removeRow,
+    removeRows,
+    restore,
   } = useCollection(initialCollection, collectionId)
 
+  const { toast } = useToast()
+
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
+  const [bulkEditOpen, setBulkEditOpen] = useState(false)
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [activeTags, setActiveTags] = useState<string[]>([])
   const [columnDialog, setColumnDialog] = useState(false)
   const [cardDialog, setCardDialog] = useState(false)
   const [importDialog, setImportDialog] = useState(false)
+  const [pairsDialog, setPairsDialog] = useState(false)
+  const [fieldsDialog, setFieldsDialog] = useState(false)
   const [editingRow, setEditingRow] = useState<CardRow | null>(null)
+
+  const hasFieldColumns = collection.columns.some(
+    (c) => (c.type === "text" && c.id !== "name") || c.type === "number" || c.type === "tag",
+  )
 
   const tagCol = collection.columns.find((c) => c.type === "tag")
   const allTagOptions = tagCol?.options ?? []
   const artworkCol = collection.columns.find((c) => c.isArtwork) ?? collection.columns.find((c) => c.type === "image")
+  const templateCol = collection.columns.find((c) => c.type === "file")
 
   const filteredRows = useMemo(() => {
     return collection.rows.filter((row) => {
@@ -70,6 +90,31 @@ export function CollectionManager({
   }, [collection.rows, search, activeTags, tagCol])
 
   const selectedRow = collection.rows.find((r) => r.id === selectedId) ?? null
+
+  // Bulk selection is keyed off row ids; deriving the rows from the live
+  // collection means deleted ids fall out automatically.
+  const checkedRows = collection.rows.filter((r) => checkedIds.has(r.id))
+  const allFilteredChecked = filteredRows.length > 0 && filteredRows.every((r) => checkedIds.has(r.id))
+
+  const toggleChecked = (id: string) => {
+    setCheckedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleCheckedAll = () => {
+    setCheckedIds((prev) => {
+      const next = new Set(prev)
+      if (allFilteredChecked) filteredRows.forEach((r) => next.delete(r.id))
+      else filteredRows.forEach((r) => next.add(r.id))
+      return next
+    })
+  }
+
+  const clearChecked = () => setCheckedIds(new Set())
 
   const openNewCard = () => {
     setEditingRow(null)
@@ -121,17 +166,29 @@ export function CollectionManager({
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setColumnDialog(true)}>
             <Columns3 />
-            Add column
+            Add Column
           </Button>
           {artworkCol ? (
             <Button variant="outline" onClick={() => setImportDialog(true)}>
               <ImagePlus />
-              Import images
+              Import Artwork
+            </Button>
+          ) : null}
+          {artworkCol && templateCol ? (
+            <Button variant="outline" onClick={() => setPairsDialog(true)}>
+              <Layers />
+              Import Artwork + Templates
+            </Button>
+          ) : null}
+          {hasFieldColumns ? (
+            <Button variant="outline" onClick={() => setFieldsDialog(true)}>
+              <Sheet />
+              Import Fields
             </Button>
           ) : null}
           <Button onClick={openNewCard}>
             <Plus />
-            New card
+            New Card
           </Button>
           {isAdmin ? (
             <Button variant="outline" onClick={() => router.push("/admin")}>
@@ -157,7 +214,7 @@ export function CollectionManager({
         </div>
       </header>
 
-      <div className="grid flex-1 gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid flex-1 gap-6 lg:grid-cols-[1fr_440px]">
         <div className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-col gap-3">
             <div className="relative">
@@ -192,21 +249,70 @@ export function CollectionManager({
             ) : null}
           </div>
 
+          {checkedRows.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2">
+              <span className="text-sm font-medium">
+                {checkedRows.length} selected
+              </span>
+              <div className="ml-auto flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setBulkEditOpen(true)}>
+                  <Pencil className="size-4" />
+                  Edit
+                </Button>
+                <Button variant="destructive" size="sm" onClick={() => setBulkDeleteOpen(true)}>
+                  <Trash2 className="size-4" />
+                  Delete
+                </Button>
+                <Button variant="ghost" size="sm" onClick={clearChecked}>
+                  <X className="size-4" />
+                  Clear
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
           <DataGrid
             columns={collection.columns}
             rows={filteredRows}
             selectedId={selectedId}
+            checkedIds={checkedIds}
             onSelect={setSelectedId}
+            onToggleChecked={toggleChecked}
+            onToggleCheckedAll={toggleCheckedAll}
             onEdit={openEditCard}
             onDeleteRow={(id) => {
+              const snapshot = collection
+              const name = String(collection.rows.find((r) => r.id === id)?.values.name ?? "card")
               removeRow(id)
               if (selectedId === id) setSelectedId(null)
+              toast({
+                message: `Deleted "${name}"`,
+                actionLabel: "Undo",
+                onAction: () => restore(snapshot),
+              })
             }}
-            onDeleteColumn={removeColumn}
+            onDeleteColumn={(id) => {
+              const snapshot = collection
+              const name = collection.columns.find((c) => c.id === id)?.name ?? "column"
+              removeColumn(id)
+              toast({
+                message: `Deleted column "${name}"`,
+                actionLabel: "Undo",
+                onAction: () => restore(snapshot),
+              })
+            }}
             onReorderColumns={reorderColumns}
             onUpdateCell={updateCell}
             onCreateTagOption={addTagOption}
-            onDeleteTagOption={removeTagOption}
+            onDeleteTagOption={(columnId, option) => {
+              const snapshot = collection
+              removeTagOption(columnId, option)
+              toast({
+                message: `Deleted tag "${option}"`,
+                actionLabel: "Undo",
+                onAction: () => restore(snapshot),
+              })
+            }}
           />
         </div>
 
@@ -228,6 +334,82 @@ export function CollectionManager({
           }}
         />
       ) : null}
+      {artworkCol && templateCol ? (
+        <ImportPairsDialog
+          open={pairsDialog}
+          onClose={() => setPairsDialog(false)}
+          onImport={(imported) => {
+            const ids = addRows(
+              imported.map((item) => {
+                const values: Record<string, string> = { name: item.name }
+                if (item.artworkUrl) values[artworkCol.id] = item.artworkUrl
+                if (item.templateUrl) values[templateCol.id] = item.templateUrl
+                return values
+              }),
+            )
+            if (ids[0]) setSelectedId(ids[0])
+          }}
+        />
+      ) : null}
+      <ImportFieldsDialog
+        open={fieldsDialog}
+        onClose={() => setFieldsDialog(false)}
+        columns={collection.columns}
+        rows={collection.rows}
+        onApply={(updates, newTagOptions) => {
+          newTagOptions.forEach(({ columnId, options }) =>
+            options.forEach((option) => addTagOption(columnId, option)),
+          )
+          updates.forEach((u) => updateRow(u.rowId, u.values))
+          if (updates[0]) setSelectedId(updates[0].rowId)
+        }}
+      />
+      <BulkEditDialog
+        open={bulkEditOpen}
+        onClose={() => setBulkEditOpen(false)}
+        columns={collection.columns}
+        rows={checkedRows}
+        onApply={(updates, newTagOptions) => {
+          newTagOptions.forEach(({ columnId, options }) =>
+            options.forEach((option) => addTagOption(columnId, option)),
+          )
+          updateRows(updates)
+          clearChecked()
+        }}
+      />
+
+      <Modal
+        open={bulkDeleteOpen}
+        onClose={() => setBulkDeleteOpen(false)}
+        title={`Delete ${checkedRows.length} card${checkedRows.length === 1 ? "" : "s"}?`}
+        description="This permanently removes the selected cards from this collection. This can't be undone."
+      >
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setBulkDeleteOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              const snapshot = collection
+              const ids = checkedRows.map((r) => r.id)
+              const count = ids.length
+              removeRows(ids)
+              if (selectedId && ids.includes(selectedId)) setSelectedId(null)
+              clearChecked()
+              setBulkDeleteOpen(false)
+              toast({
+                message: `Deleted ${count} card${count === 1 ? "" : "s"}`,
+                actionLabel: "Undo",
+                onAction: () => restore(snapshot),
+              })
+            }}
+          >
+            Delete {checkedRows.length} card{checkedRows.length === 1 ? "" : "s"}
+          </Button>
+        </div>
+      </Modal>
+
       <CardFormDialog
         open={cardDialog}
         onClose={() => setCardDialog(false)}

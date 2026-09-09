@@ -3,7 +3,7 @@ import path from "path"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { EXTENSION_MIME, UPLOAD_DIR } from "@/lib/uploads"
+import { EXTENSION_MIME, TEMPLATE_EXTENSION_MIME, UPLOAD_DIR } from "@/lib/uploads"
 
 export async function GET(_request: Request, { params }: { params: Promise<{ path: string[] }> }) {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -13,9 +13,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
 
   const segments = (await params).path ?? []
 
-  // Collections (and their artwork) are shared, so any signed-in user may read
-  // any uploaded image. The first path segment is just the uploader's user id
-  // namespace; we no longer restrict reads to the caller's own namespace.
+  // Collections (and their artwork/templates) are shared, so any signed-in user
+  // may read any uploaded file. The first path segment is just the uploader's
+  // user id namespace; we no longer restrict reads to the caller's own namespace.
 
   // Resolve the target and confirm it stays inside UPLOAD_DIR (block `..`).
   const root = path.resolve(UPLOAD_DIR)
@@ -25,19 +25,25 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
   }
 
   const ext = path.extname(resolved).slice(1).toLowerCase()
-  const contentType = EXTENSION_MIME[ext]
-  if (!contentType) {
+  const imageType = EXTENSION_MIME[ext]
+  const templateType = TEMPLATE_EXTENSION_MIME[ext]
+  if (!imageType && !templateType) {
     return new NextResponse("Unsupported", { status: 415 })
   }
 
   try {
     const data = await readFile(resolved)
-    return new NextResponse(new Uint8Array(data), {
-      headers: {
-        "Content-Type": contentType,
-        "Cache-Control": "private, max-age=3600",
-      },
-    })
+    const responseHeaders: Record<string, string> = {
+      "Content-Type": imageType ?? templateType,
+      "Cache-Control": "private, max-age=3600",
+    }
+    // Template/source files are always sent as a download, never rendered
+    // inline (this also neutralizes any SVG script content).
+    if (!imageType && templateType) {
+      const base = path.basename(resolved)
+      responseHeaders["Content-Disposition"] = `attachment; filename="${base.replace(/"/g, "")}"`
+    }
+    return new NextResponse(new Uint8Array(data), { headers: responseHeaders })
   } catch {
     return new NextResponse("Not found", { status: 404 })
   }

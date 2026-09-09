@@ -66,6 +66,7 @@ export function AddColumnDialog({ open, onClose, onAdd }: AddColumnDialogProps) 
             <option value="number">Number</option>
             <option value="tag">Tag (multiselect)</option>
             <option value="image">Image (upload)</option>
+            <option value="file">File (upload)</option>
           </Select>
         </div>
         {type === "tag" ? (

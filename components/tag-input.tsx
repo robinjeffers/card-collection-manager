@@ -22,14 +22,22 @@ export function TagInput({ value, options, onChange, onCreateOption, onDeleteOpt
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [mounted, setMounted] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
-  const [menuStyle, setMenuStyle] = useState<{ left: number; top: number; width: number; openUp: boolean }>({
+  const [menuStyle, setMenuStyle] = useState<{
+    left: number
+    top: number
+    width: number
+    openUp: boolean
+    maxHeight: number
+  }>({
     left: 0,
     top: 0,
     width: 0,
     openUp: false,
+    maxHeight: DROPDOWN_MAX_HEIGHT,
   })
 
   useEffect(() => setMounted(true), [])
@@ -41,19 +49,33 @@ export function TagInput({ value, options, onChange, onCreateOption, onDeleteOpt
     const el = triggerRef.current
     if (!el) return
     const rect = el.getBoundingClientRect()
-    const spaceBelow = window.innerHeight - rect.bottom
-    const openUp = spaceBelow < DROPDOWN_MAX_HEIGHT && rect.top > spaceBelow
+    const margin = 8
+    const spaceBelow = window.innerHeight - rect.bottom - margin
+    const spaceAbove = rect.top - margin
+    const openUp = spaceBelow < DROPDOWN_MAX_HEIGHT && spaceAbove > spaceBelow
+    // Let the menu grow to fill the space in whichever direction it opens, so
+    // as many tags as possible are visible without scrolling.
+    const maxHeight = Math.min(480, Math.max(180, openUp ? spaceAbove : spaceBelow))
+    // Give the menu room for chips to wrap side-by-side (wider than a narrow
+    // cell), while keeping it on-screen.
+    const width = Math.min(320, Math.max(rect.width, 256), window.innerWidth - rect.left - margin)
     setMenuStyle({
       left: rect.left,
       top: openUp ? rect.top : rect.bottom,
-      width: rect.width,
+      width,
       openUp,
+      maxHeight,
     })
   }, [])
 
   useLayoutEffect(() => {
     if (open) reposition()
   }, [open, reposition])
+
+  // Clear any pending delete confirmation whenever the menu closes.
+  useEffect(() => {
+    if (!open) setPendingDelete(null)
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -86,7 +108,9 @@ export function TagInput({ value, options, onChange, onCreateOption, onDeleteOpt
   }
 
   const trimmed = query.trim()
-  const filtered = options.filter((o) => o.toLowerCase().includes(trimmed.toLowerCase()))
+  const filtered = options
+    .filter((o) => o.toLowerCase().includes(trimmed.toLowerCase()))
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true }))
   const canCreate =
     !!onCreateOption && trimmed.length > 0 && !options.some((o) => o.toLowerCase() === trimmed.toLowerCase())
 
@@ -162,58 +186,91 @@ export function TagInput({ value, options, onChange, onCreateOption, onDeleteOpt
                   />
                 </div>
               ) : null}
-              <ul className="max-h-52 overflow-y-auto p-1" role="listbox">
-                {filtered.map((tag) => {
-                  const active = value.includes(tag)
-                  return (
-                    <li key={tag} className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => toggle(tag)}
-                        className="flex flex-1 items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+              <div
+                className="overflow-y-auto p-2"
+                style={{ maxHeight: menuStyle.maxHeight - (onCreateOption ? 52 : 0) }}
+                role="listbox"
+              >
+                <div className="flex flex-wrap gap-1.5">
+                  {filtered.map((tag) => {
+                    const active = value.includes(tag)
+                    return (
+                      <span
+                        key={tag}
+                        style={tagStyle(tag, options)}
+                        className={cn(
+                          "group inline-flex items-center gap-1 rounded-md border px-1.5 py-1 text-xs font-medium",
+                          active && "ring-2 ring-primary ring-offset-1 ring-offset-popover",
+                        )}
                       >
-                        <span
-                          style={tagStyle(tag, options)}
-                          className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-xs font-medium"
-                        >
-                          {tag}
-                        </span>
-                        {active ? <Check className="size-4 text-primary" /> : null}
-                      </button>
-                      {onDeleteOption ? (
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            deleteOption(tag)
-                          }}
-                          className="shrink-0 rounded-md p-1.5 text-muted-foreground/60 hover:bg-destructive/15 hover:text-destructive"
-                          aria-label={`Delete tag "${tag}" from this column`}
+                          onClick={() => toggle(tag)}
+                          className="inline-flex items-center gap-1"
                         >
-                          <Trash2 className="size-3.5" />
+                          {active ? <Check className="size-3" /> : null}
+                          {tag}
                         </button>
-                      ) : null}
-                    </li>
-                  )
-                })}
-                {canCreate ? (
-                  <li>
+                        {onDeleteOption ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setPendingDelete(tag)
+                            }}
+                            className="-mr-0.5 ml-0.5 rounded p-0.5 opacity-50 transition-opacity hover:opacity-100"
+                            aria-label={`Delete tag "${tag}" from this column`}
+                          >
+                            <Trash2 className="size-3" />
+                          </button>
+                        ) : null}
+                      </span>
+                    )
+                  })}
+                  {canCreate ? (
                     <button
                       type="button"
                       onClick={create}
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                      className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
                     >
-                      <Plus className="size-4" />
+                      <Plus className="size-3" />
                       Create {'"'}
                       {trimmed}
                       {'"'}
                     </button>
-                  </li>
-                ) : null}
-                {filtered.length === 0 && !canCreate ? (
-                  <li className="px-2 py-1.5 text-sm text-muted-foreground">No tags found</li>
-                ) : null}
-              </ul>
+                  ) : null}
+                  {filtered.length === 0 && !canCreate ? (
+                    <span className="px-1 py-1 text-sm text-muted-foreground">No tags found</span>
+                  ) : null}
+                </div>
+              </div>
+
+              {pendingDelete ? (
+                <div className="flex items-center justify-between gap-2 border-t border-border bg-muted/40 p-2">
+                  <span className="min-w-0 truncate text-sm">
+                    Delete <span className="font-semibold">{pendingDelete}</span>? Are you sure?
+                  </span>
+                  <div className="flex shrink-0 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setPendingDelete(null)}
+                      className="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        deleteOption(pendingDelete)
+                        setPendingDelete(null)
+                      }}
+                      className="rounded-md bg-destructive px-2 py-1 text-xs font-medium text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>,
             document.body,
           )

@@ -2,17 +2,20 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { Download, KeyRound, Layers, LogOut, Pencil, Plus, ShieldCheck, Sparkles, Trash2 } from "lucide-react"
+import { Download, ImageIcon, KeyRound, Layers, LogOut, Pencil, Plus, ShieldCheck, Sparkles, Trash2 } from "lucide-react"
 import { signOut } from "@/lib/auth-client"
 import { ChangePasswordDialog } from "@/components/change-password-dialog"
+import { ImageUpload } from "@/components/image-upload"
 import {
   createCollection,
   deleteCollection,
   renameCollection,
+  setCollectionBanner,
 } from "@/app/actions/collection"
 import { Button } from "@/components/ui/button"
 import { Modal } from "@/components/ui/modal"
 import { Input, Label } from "@/components/ui/field"
+import { APP_VERSION } from "@/lib/version"
 import type { CollectionSummary } from "@/lib/types"
 
 export function CollectionsHome({
@@ -33,6 +36,11 @@ export function CollectionsHome({
   const [renameValue, setRenameValue] = useState("")
   const [deleting, setDeleting] = useState<CollectionSummary | null>(null)
   const [passwordOpen, setPasswordOpen] = useState(false)
+  const [bannering, setBannering] = useState<CollectionSummary | null>(null)
+  const [bannerValue, setBannerValue] = useState("")
+  const [exporting, setExporting] = useState<CollectionSummary | null>(null)
+  const [exportArtwork, setExportArtwork] = useState(true)
+  const [exportTemplates, setExportTemplates] = useState(true)
 
   const submitCreate = () => {
     startTransition(async () => {
@@ -63,6 +71,39 @@ export function CollectionsHome({
     })
   }
 
+  const openExport = (c: CollectionSummary) => {
+    setExportArtwork(true)
+    setExportTemplates(true)
+    setExporting(c)
+  }
+
+  const submitExport = () => {
+    if (!exporting) return
+    const params = new URLSearchParams()
+    if (!exportArtwork) params.set("artwork", "0")
+    if (!exportTemplates) params.set("templates", "0")
+    const query = params.toString()
+    window.location.href = `/api/collections/${exporting.id}/export${query ? `?${query}` : ""}`
+    setExporting(null)
+  }
+
+  const openBanner = (c: CollectionSummary) => {
+    setBannering(c)
+    setBannerValue(c.bannerUrl ?? "")
+  }
+
+  // Fired on every upload/remove inside the banner dialog; persists immediately
+  // so the change is reflected on the card as soon as the dialog is closed.
+  const handleBannerChange = (url: string) => {
+    if (!bannering) return
+    const target = bannering
+    setBannerValue(url)
+    startTransition(async () => {
+      await setCollectionBanner(target.id, url)
+      router.refresh()
+    })
+  }
+
   return (
     <div className="mx-auto flex min-h-svh max-w-5xl flex-col px-4 py-8 lg:px-8">
       <header className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -71,7 +112,7 @@ export function CollectionsHome({
             <Sparkles className="size-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-balance">Your Collections</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-balance">Card Collection Manager</h1>
             <p className="text-sm text-muted-foreground">Signed in as {userName}</p>
           </div>
         </div>
@@ -123,31 +164,44 @@ export function CollectionsHome({
         {collections.map((c) => (
           <div
             key={c.id}
-            className="group relative flex min-h-40 flex-col justify-between rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/60"
+            className="group relative flex min-h-44 flex-col overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary/60"
           >
             <button
               type="button"
               onClick={() => router.push(`/collections/${c.id}`)}
-              className="flex flex-1 flex-col items-start gap-3 text-left"
+              className="flex flex-1 flex-col text-left"
             >
-              <span className="flex size-10 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
-                <Layers className="size-5" />
+              <span className="relative block aspect-[3/1] w-full overflow-hidden border-b border-border">
+                {c.bannerUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={c.bannerUrl || "/placeholder.svg"} alt="" className="size-full object-cover" />
+                ) : (
+                  <span className="flex size-full items-center justify-center bg-gradient-to-br from-secondary via-secondary to-muted text-secondary-foreground/40">
+                    <Layers className="size-6" />
+                  </span>
+                )}
               </span>
-              <span className="flex flex-col gap-0.5">
+              <span className="flex flex-1 flex-col gap-0.5 p-5">
                 <span className="font-medium text-balance">{c.name}</span>
                 <span className="text-xs text-muted-foreground">
                   {c.cardCount} card{c.cardCount === 1 ? "" : "s"}
                 </span>
               </span>
             </button>
-            <div className="mt-3 flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+            <div className="absolute right-2 top-2 flex items-center gap-0.5 rounded-lg bg-background/70 p-0.5 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`Set banner for ${c.name}`}
+                onClick={() => openBanner(c)}
+              >
+                <ImageIcon className="size-4" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
                 aria-label={`Export ${c.name}`}
-                onClick={() => {
-                  window.location.href = `/api/collections/${c.id}/export`
-                }}
+                onClick={() => openExport(c)}
               >
                 <Download className="size-4" />
               </Button>
@@ -175,7 +229,71 @@ export function CollectionsHome({
         ))}
       </div>
 
+      <footer className="mt-auto pt-10 text-center text-xs text-muted-foreground">
+        Card Collection Manager <span className="tabular-nums">v{APP_VERSION}</span>
+      </footer>
+
       <ChangePasswordDialog open={passwordOpen} onClose={() => setPasswordOpen(false)} />
+
+      <Modal open={!!bannering} onClose={() => setBannering(null)} title="Collection banner">
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            Upload a banner for{" "}
+            <span className="font-medium text-foreground">{bannering?.name}</span>. The ideal size
+            is <span className="font-medium text-foreground">1200 × 400 px</span> (a 3:1 ratio);
+            other sizes are cropped to fit.
+          </p>
+          <ImageUpload variant="banner" value={bannerValue} onChange={handleBannerChange} />
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setBannering(null)}>
+              Done
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!exporting}
+        onClose={() => setExporting(null)}
+        title="Export collection"
+        description="Card data is always included as JSON and CSV. Choose which media files to bundle."
+      >
+        <div className="flex flex-col gap-4">
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:border-primary/60">
+            <input
+              type="checkbox"
+              checked={exportArtwork}
+              onChange={(e) => setExportArtwork(e.target.checked)}
+              className="size-4 shrink-0 accent-primary"
+            />
+            <span className="flex flex-col">
+              <span className="text-sm font-medium">Include artwork</span>
+              <span className="text-xs text-muted-foreground">Card images bundled in an images/ folder.</span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:border-primary/60">
+            <input
+              type="checkbox"
+              checked={exportTemplates}
+              onChange={(e) => setExportTemplates(e.target.checked)}
+              className="size-4 shrink-0 accent-primary"
+            />
+            <span className="flex flex-col">
+              <span className="text-sm font-medium">Include templates</span>
+              <span className="text-xs text-muted-foreground">Source/template files bundled in a templates/ folder.</span>
+            </span>
+          </label>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setExporting(null)}>
+              Cancel
+            </Button>
+            <Button onClick={submitExport}>
+              <Download className="size-4" />
+              Export
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="New collection">
         <div className="flex flex-col gap-4">

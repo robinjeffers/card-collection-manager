@@ -12,6 +12,7 @@ export function emptyCollection(): Collection {
     columns: [
       { id: "name", name: "Card Name", type: "text", locked: true },
       { id: "artwork", name: "Artwork", type: "image", locked: true, isArtwork: true },
+      { id: "template", name: "Template", type: "file", locked: true },
     ],
     rows: [],
   }
@@ -21,6 +22,7 @@ export const defaultCollection: Collection = {
   columns: [
     { id: "name", name: "Card Name", type: "text", locked: true },
     { id: "artwork", name: "Artwork", type: "image", locked: true, isArtwork: true },
+    { id: "template", name: "Template", type: "file", locked: true },
     { id: "tags", name: "Deck Tags", type: "tag", options: [...DECK_TAGS], locked: true },
     { id: "strength", name: "Strength", type: "number", locked: true },
     { id: "dexterity", name: "Dexterity", type: "number", locked: true },

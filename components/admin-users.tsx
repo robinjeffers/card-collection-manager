@@ -67,7 +67,7 @@ export function AdminUsers({
   }
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-4xl flex-col px-4 py-6 lg:px-8">
+    <div className="mx-auto flex max-w-4xl flex-col px-4 pt-6 lg:px-8">
       <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
