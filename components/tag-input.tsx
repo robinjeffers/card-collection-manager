@@ -108,7 +108,9 @@ export function TagInput({ value, options, onChange, onCreateOption, onDeleteOpt
   }
 
   const trimmed = query.trim()
-  const filtered = options.filter((o) => o.toLowerCase().includes(trimmed.toLowerCase()))
+  const filtered = options
+    .filter((o) => o.toLowerCase().includes(trimmed.toLowerCase()))
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true }))
   const canCreate =
     !!onCreateOption && trimmed.length > 0 && !options.some((o) => o.toLowerCase() === trimmed.toLowerCase())
 
