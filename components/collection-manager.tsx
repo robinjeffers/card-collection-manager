@@ -129,13 +129,13 @@ export function CollectionManager({
           {artworkCol ? (
             <Button variant="outline" onClick={() => setImportDialog(true)}>
               <ImagePlus />
-              Import images
+              Import Artwork
             </Button>
           ) : null}
           {artworkCol && templateCol ? (
             <Button variant="outline" onClick={() => setPairsDialog(true)}>
               <Layers />
-              Import artwork + templates
+              Import Artwork + Templates
             </Button>
           ) : null}
           <Button onClick={openNewCard}>
