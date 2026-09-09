@@ -40,7 +40,10 @@ function computeColWidthCh(col: Column, rows: CardRow[]): number {
   const header = col.name.length + 9
   switch (col.type) {
     case "number":
-      return clamp(header, 10, 18)
+      // Number headers are centered and carry the most chrome (grip + icon +
+      // label + delete), so they need extra room to avoid truncating short
+      // labels like "Qty".
+      return clamp(col.name.length + 12, 15, 22)
     case "tag":
       return clamp(header, 24, 40)
     case "image":
