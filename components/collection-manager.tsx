@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Check, Columns3, ImagePlus, Layers, Loader2, LogOut, Plus, Search, ShieldCheck } from "lucide-react"
+import { ArrowLeft, Check, Columns3, ImagePlus, Layers, Loader2, LogOut, Plus, Search, ShieldCheck, Sheet } from "lucide-react"
 import { useCollection } from "@/hooks/use-collection"
 import { signOut } from "@/lib/auth-client"
 import { DataGrid } from "@/components/data-grid"
@@ -11,6 +11,7 @@ import { AddColumnDialog } from "@/components/add-column-dialog"
 import { CardFormDialog } from "@/components/card-form-dialog"
 import { ImportImagesDialog } from "@/components/import-images-dialog"
 import { ImportPairsDialog } from "@/components/import-pairs-dialog"
+import { ImportFieldsDialog } from "@/components/import-fields-dialog"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/ui/field"
 import { tagStyle } from "@/lib/tag-color"
@@ -53,7 +54,12 @@ export function CollectionManager({
   const [cardDialog, setCardDialog] = useState(false)
   const [importDialog, setImportDialog] = useState(false)
   const [pairsDialog, setPairsDialog] = useState(false)
+  const [fieldsDialog, setFieldsDialog] = useState(false)
   const [editingRow, setEditingRow] = useState<CardRow | null>(null)
+
+  const hasFieldColumns = collection.columns.some(
+    (c) => (c.type === "text" && c.id !== "name") || c.type === "number" || c.type === "tag",
+  )
 
   const tagCol = collection.columns.find((c) => c.type === "tag")
   const allTagOptions = tagCol?.options ?? []
@@ -136,6 +142,12 @@ export function CollectionManager({
             <Button variant="outline" onClick={() => setPairsDialog(true)}>
               <Layers />
               Import Artwork + Templates
+            </Button>
+          ) : null}
+          {hasFieldColumns ? (
+            <Button variant="outline" onClick={() => setFieldsDialog(true)}>
+              <Sheet />
+              Import Fields
             </Button>
           ) : null}
           <Button onClick={openNewCard}>
@@ -254,6 +266,19 @@ export function CollectionManager({
           }}
         />
       ) : null}
+      <ImportFieldsDialog
+        open={fieldsDialog}
+        onClose={() => setFieldsDialog(false)}
+        columns={collection.columns}
+        rows={collection.rows}
+        onApply={(updates, newTagOptions) => {
+          newTagOptions.forEach(({ columnId, options }) =>
+            options.forEach((option) => addTagOption(columnId, option)),
+          )
+          updates.forEach((u) => updateRow(u.rowId, u.values))
+          if (updates[0]) setSelectedId(updates[0].rowId)
+        }}
+      />
       <CardFormDialog
         open={cardDialog}
         onClose={() => setCardDialog(false)}
