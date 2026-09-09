@@ -178,7 +178,7 @@ export function CollectionManager({
         </div>
       </header>
 
-      <div className="grid flex-1 gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid flex-1 gap-6 lg:grid-cols-[1fr_440px]">
         <div className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-col gap-3">
             <div className="relative">
