@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { HardDrive, Loader2, RefreshCw, Trash2 } from "lucide-react"
+import { Download, HardDrive, Loader2, RefreshCw, Trash2 } from "lucide-react"
 import { cleanupOrphans, rescanStorage } from "@/app/actions/maintenance"
 import type { StorageCategory, StorageReport } from "@/lib/storage-report"
 import { Button } from "@/components/ui/button"
@@ -37,6 +37,34 @@ export function StorageMaintenance({ initialReport }: { initialReport: StorageRe
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [backingUp, setBackingUp] = useState(false)
+
+  const downloadBackup = async () => {
+    setError(null)
+    setNotice(null)
+    setBackingUp(true)
+    try {
+      const res = await fetch("/api/admin/backup")
+      if (!res.ok) throw new Error(`Backup failed (${res.status})`)
+      const blob = await res.blob()
+      const disposition = res.headers.get("Content-Disposition") ?? ""
+      const match = disposition.match(/filename="([^"]+)"/)
+      const filename = match?.[1] ?? "ccm-backup.zip"
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      setNotice(`Backup downloaded (${formatBytes(blob.size)}).`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Backup failed")
+    } finally {
+      setBackingUp(false)
+    }
+  }
 
   const run = (kind: "rescan" | "cleanup", fn: () => Promise<void>) => {
     setError(null)
@@ -189,6 +217,20 @@ export function StorageMaintenance({ initialReport }: { initialReport: StorageRe
         >
           {pending && action === "cleanup" ? <Loader2 className="animate-spin" /> : <Trash2 />}
           Clean up
+        </Button>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-medium">Full backup</h3>
+          <p className="text-sm text-muted-foreground">
+            Download every collection and its uploaded files as a single zip. Includes raw data
+            (for exact restore), a CSV per collection, and all artwork and template files.
+          </p>
+        </div>
+        <Button variant="outline" onClick={downloadBackup} disabled={backingUp} className="shrink-0">
+          {backingUp ? <Loader2 className="animate-spin" /> : <Download />}
+          {backingUp ? "Preparing…" : "Download backup"}
         </Button>
       </div>
 
