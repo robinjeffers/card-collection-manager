@@ -38,6 +38,9 @@ export function CollectionsHome({
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [bannering, setBannering] = useState<CollectionSummary | null>(null)
   const [bannerValue, setBannerValue] = useState("")
+  const [exporting, setExporting] = useState<CollectionSummary | null>(null)
+  const [exportArtwork, setExportArtwork] = useState(true)
+  const [exportTemplates, setExportTemplates] = useState(true)
 
   const submitCreate = () => {
     startTransition(async () => {
@@ -66,6 +69,22 @@ export function CollectionsHome({
       setDeleting(null)
       router.refresh()
     })
+  }
+
+  const openExport = (c: CollectionSummary) => {
+    setExportArtwork(true)
+    setExportTemplates(true)
+    setExporting(c)
+  }
+
+  const submitExport = () => {
+    if (!exporting) return
+    const params = new URLSearchParams()
+    if (!exportArtwork) params.set("artwork", "0")
+    if (!exportTemplates) params.set("templates", "0")
+    const query = params.toString()
+    window.location.href = `/api/collections/${exporting.id}/export${query ? `?${query}` : ""}`
+    setExporting(null)
   }
 
   const openBanner = (c: CollectionSummary) => {
@@ -182,9 +201,7 @@ export function CollectionsHome({
                 variant="ghost"
                 size="icon"
                 aria-label={`Export ${c.name}`}
-                onClick={() => {
-                  window.location.href = `/api/collections/${c.id}/export`
-                }}
+                onClick={() => openExport(c)}
               >
                 <Download className="size-4" />
               </Button>
@@ -230,6 +247,49 @@ export function CollectionsHome({
           <div className="flex justify-end">
             <Button variant="outline" onClick={() => setBannering(null)}>
               Done
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!exporting}
+        onClose={() => setExporting(null)}
+        title="Export collection"
+        description="Card data is always included as JSON and CSV. Choose which media files to bundle."
+      >
+        <div className="flex flex-col gap-4">
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:border-primary/60">
+            <input
+              type="checkbox"
+              checked={exportArtwork}
+              onChange={(e) => setExportArtwork(e.target.checked)}
+              className="size-4 shrink-0 accent-primary"
+            />
+            <span className="flex flex-col">
+              <span className="text-sm font-medium">Include artwork</span>
+              <span className="text-xs text-muted-foreground">Card images bundled in an images/ folder.</span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:border-primary/60">
+            <input
+              type="checkbox"
+              checked={exportTemplates}
+              onChange={(e) => setExportTemplates(e.target.checked)}
+              className="size-4 shrink-0 accent-primary"
+            />
+            <span className="flex flex-col">
+              <span className="text-sm font-medium">Include templates</span>
+              <span className="text-xs text-muted-foreground">Source/template files bundled in a templates/ folder.</span>
+            </span>
+          </label>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setExporting(null)}>
+              Cancel
+            </Button>
+            <Button onClick={submitExport}>
+              <Download className="size-4" />
+              Export
             </Button>
           </div>
         </div>

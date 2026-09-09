@@ -47,6 +47,10 @@ shape yourself:
     remove / replace tags).
   - **Bulk delete** selected cards in one action.
 - **Bulk field import** to populate column values across many cards at once.
+> - **Per-collection export** — download a single collection as a `.zip` from its card on the home
+  screen. Card data is always included as `collection.json` and `collection.csv`; a confirmation
+  dialog lets you choose whether to also bundle artwork (`images/`) and template files
+  (`templates/`).
 
 ### Safety nets
 
