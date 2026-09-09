@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Check, Columns3, ImagePlus, Loader2, LogOut, Plus, Search, ShieldCheck } from "lucide-react"
+import { ArrowLeft, Check, Columns3, ImagePlus, Layers, Loader2, LogOut, Plus, Search, ShieldCheck } from "lucide-react"
 import { useCollection } from "@/hooks/use-collection"
 import { signOut } from "@/lib/auth-client"
 import { DataGrid } from "@/components/data-grid"
@@ -10,6 +10,7 @@ import { ImagePreview } from "@/components/image-preview"
 import { AddColumnDialog } from "@/components/add-column-dialog"
 import { CardFormDialog } from "@/components/card-form-dialog"
 import { ImportImagesDialog } from "@/components/import-images-dialog"
+import { ImportPairsDialog } from "@/components/import-pairs-dialog"
 import { Button } from "@/components/ui/button"
 import { fieldClass } from "@/components/ui/field"
 import { tagStyle } from "@/lib/tag-color"
@@ -51,11 +52,13 @@ export function CollectionManager({
   const [columnDialog, setColumnDialog] = useState(false)
   const [cardDialog, setCardDialog] = useState(false)
   const [importDialog, setImportDialog] = useState(false)
+  const [pairsDialog, setPairsDialog] = useState(false)
   const [editingRow, setEditingRow] = useState<CardRow | null>(null)
 
   const tagCol = collection.columns.find((c) => c.type === "tag")
   const allTagOptions = tagCol?.options ?? []
   const artworkCol = collection.columns.find((c) => c.isArtwork) ?? collection.columns.find((c) => c.type === "image")
+  const templateCol = collection.columns.find((c) => c.type === "file")
 
   const filteredRows = useMemo(() => {
     return collection.rows.filter((row) => {
@@ -127,6 +130,12 @@ export function CollectionManager({
             <Button variant="outline" onClick={() => setImportDialog(true)}>
               <ImagePlus />
               Import images
+            </Button>
+          ) : null}
+          {artworkCol && templateCol ? (
+            <Button variant="outline" onClick={() => setPairsDialog(true)}>
+              <Layers />
+              Import artwork + templates
             </Button>
           ) : null}
           <Button onClick={openNewCard}>
@@ -223,6 +232,23 @@ export function CollectionManager({
           onImport={(imported) => {
             const ids = addRows(
               imported.map((item) => ({ name: item.name, [artworkCol.id]: item.url })),
+            )
+            if (ids[0]) setSelectedId(ids[0])
+          }}
+        />
+      ) : null}
+      {artworkCol && templateCol ? (
+        <ImportPairsDialog
+          open={pairsDialog}
+          onClose={() => setPairsDialog(false)}
+          onImport={(imported) => {
+            const ids = addRows(
+              imported.map((item) => {
+                const values: Record<string, string> = { name: item.name }
+                if (item.artworkUrl) values[artworkCol.id] = item.artworkUrl
+                if (item.templateUrl) values[templateCol.id] = item.templateUrl
+                return values
+              }),
             )
             if (ids[0]) setSelectedId(ids[0])
           }}
