@@ -5,9 +5,19 @@ import { GripVertical, Hash, ImageIcon, Lock, Paperclip, Pencil, Tag, Trash2, Ty
 import { TagInput } from "@/components/tag-input"
 import { ImageUpload } from "@/components/image-upload"
 import { FileUpload } from "@/components/file-upload"
+import { Modal } from "@/components/ui/modal"
+import { Button } from "@/components/ui/button"
 import { tagStyle } from "@/lib/tag-color"
 import { cn } from "@/lib/utils"
 import type { CardRow, CellValue, Column } from "@/lib/types"
+
+/** True when a cell holds a real value (non-empty string / non-empty array / number). */
+function hasValue(value: CellValue): boolean {
+  if (value == null) return false
+  if (Array.isArray(value)) return value.length > 0
+  if (typeof value === "string") return value.trim() !== ""
+  return true
+}
 
 const TYPE_ICON = {
   text: Type,
@@ -52,6 +62,11 @@ export function DataGrid({
   const dragIndexRef = useRef<number | null>(null)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [overIndex, setOverIndex] = useState<number | null>(null)
+  const [pendingDeleteCol, setPendingDeleteCol] = useState<Column | null>(null)
+
+  const affectedCount = pendingDeleteCol
+    ? rows.filter((r) => hasValue(r.values[pendingDeleteCol.id])).length
+    : 0
 
   const resetDrag = () => {
     dragIndexRef.current = null
@@ -103,7 +118,7 @@ export function DataGrid({
                     ) : (
                       <button
                         type="button"
-                        onClick={() => onDeleteColumn(col.id)}
+                        onClick={() => setPendingDeleteCol(col)}
                         className="ml-0.5 rounded p-0.5 text-muted-foreground/60 hover:bg-destructive/15 hover:text-destructive"
                         aria-label={`Delete column ${col.name}`}
                       >
@@ -188,6 +203,40 @@ export function DataGrid({
           No cards yet. Add your first card to get started.
         </div>
       ) : null}
+
+      <Modal
+        open={pendingDeleteCol !== null}
+        onClose={() => setPendingDeleteCol(null)}
+        title="Delete column?"
+        description={
+          pendingDeleteCol
+            ? `This permanently removes the "${pendingDeleteCol.name}" column and its values from every card. This can't be undone.`
+            : undefined
+        }
+      >
+        {affectedCount > 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {affectedCount} card{affectedCount === 1 ? "" : "s"} currently{" "}
+            {affectedCount === 1 ? "has" : "have"} data in this column that will be lost.
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">No cards have data in this column.</p>
+        )}
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setPendingDeleteCol(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              if (pendingDeleteCol) onDeleteColumn(pendingDeleteCol.id)
+              setPendingDeleteCol(null)
+            }}
+          >
+            Delete column
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }
