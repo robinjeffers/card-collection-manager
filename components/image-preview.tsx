@@ -1,22 +1,25 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { ImageOff, ImageIcon, Loader2 } from "lucide-react"
+import { ImageOff, ImageIcon, Loader2, Download } from "lucide-react"
+import { buttonVariants } from "@/components/ui/button"
 import { tagStyle } from "@/lib/tag-color"
-import { previewUrl } from "@/lib/uploads"
+import { previewUrl, thumbnailUrl } from "@/lib/uploads"
 import { createPreviewBlob } from "@/lib/image-thumbnail"
 import type { CardRow, Column } from "@/lib/types"
 
 // Some artwork requests (especially the local uploads route) occasionally stall
 // without ever firing `load` or `error`, leaving a blank preview until the
 // element is remounted. We watchdog each load and retry a fresh request a few
-// times with a cache-busting param before showing the error state.
+// times with a cache-busting param before falling back to the next tier.
 const MAX_RETRIES = 2
-const STALL_TIMEOUT_MS = 3000
+const STALL_TIMEOUT_MS = 4000
 
-// Which artifact we're currently trying to display: the small preview WebP, or
-// the full-size original as a fallback.
-type Tier = "preview" | "full"
+// The panel is a lightweight visual reference, so we only ever *display* a
+// small image: the optimized preview WebP first, then the grid thumbnail. The
+// full multi-MB original is a last-resort display (older uploads that predate
+// both derived files) and is otherwise reserved for the explicit download.
+type Tier = "preview" | "thumb" | "full"
 
 interface ImagePreviewProps {
   row: CardRow | null
@@ -32,22 +35,30 @@ export function ImagePreview({ row, columns }: ImagePreviewProps) {
   const name = nameCol && row ? String(row.values[nameCol.id] ?? "") : ""
   const tags = tagCol && row && Array.isArray(row.values[tagCol.id]) ? (row.values[tagCol.id] as string[]) : []
 
-  // The optimized preview URL for our own uploads (null for external images).
+  // Derived small-image URLs for our own uploads (null for external images).
   const preview = previewUrl(src)
+  const thumb = thumbnailUrl(src)
 
-  const [tier, setTier] = useState<Tier>(preview ? "preview" : "full")
-  const [status, setStatus] = useState<"loading" | "loaded" | "error">(src ? "loading" : "loaded")
+  // Ordered display candidates, smallest/fastest first. External images have no
+  // derived files, so they display their (already remote) original directly.
+  const tiers: { tier: Tier; url: string }[] = []
+  if (preview) tiers.push({ tier: "preview", url: preview })
+  if (thumb) tiers.push({ tier: "thumb", url: thumb })
+  if (src) tiers.push({ tier: "full", url: src })
+
+  const [tierIndex, setTierIndex] = useState(0)
   const [attempt, setAttempt] = useState(0)
+  const [status, setStatus] = useState<"loading" | "loaded" | "error">(src ? "loading" : "loaded")
   // Tracks which originals we've already tried to backfill this session so a
   // repeatedly-viewed older image doesn't re-upload its preview every time.
   const backfilled = useRef<Set<string>>(new Set())
 
   // Reset the load lifecycle whenever the selected artwork changes.
   useEffect(() => {
-    setTier(preview ? "preview" : "full")
-    setStatus(src ? "loading" : "loaded")
+    setTierIndex(0)
     setAttempt(0)
-  }, [src, preview])
+    setStatus(src ? "loading" : "loaded")
+  }, [src])
 
   // Generate the missing preview in the browser and store it beside the
   // original so subsequent views (and other users) get the fast path. Runs at
@@ -72,37 +83,44 @@ export function ImagePreview({ row, columns }: ImagePreviewProps) {
     })()
   }
 
-  // Drop from the preview tier to the full original, kicking off a backfill so
-  // the preview exists next time.
-  const downgradeToFull = () => {
-    setTier("full")
+  // Advance to the next (larger) display tier. When the preview tier fails it
+  // means no optimized file exists yet, so kick off a backfill for next time.
+  const advanceTier = () => {
+    const failing = tiers[tierIndex]?.tier
+    if (failing === "preview") backfillPreview()
+    setTierIndex((i) => i + 1)
     setAttempt(0)
     setStatus("loading")
-    backfillPreview()
   }
 
-  // Watchdog: if a load neither completes nor errors, recover.
+  const handleFailure = () => {
+    if (attempt < MAX_RETRIES) {
+      setAttempt((a) => a + 1)
+      setStatus("loading")
+    } else if (tierIndex < tiers.length - 1) {
+      advanceTier()
+    } else {
+      setStatus("error")
+    }
+  }
+
+  // Watchdog: if a load neither completes nor errors, treat it as a failure.
   useEffect(() => {
     if (status !== "loading" || !src) return
-    const timer = setTimeout(() => {
-      if (tier === "preview") downgradeToFull()
-      else if (attempt < MAX_RETRIES) setAttempt((a) => a + 1)
-      else setStatus("error")
-    }, STALL_TIMEOUT_MS)
+    const timer = setTimeout(handleFailure, STALL_TIMEOUT_MS)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, tier, attempt, src, preview])
+  }, [status, tierIndex, attempt, src])
 
-  const handleError = () => {
-    if (tier === "preview") downgradeToFull()
-    else if (attempt < MAX_RETRIES) setAttempt((a) => a + 1)
-    else setStatus("error")
-  }
-
-  const currentBase = tier === "preview" && preview ? preview : src
+  const current = tiers[tierIndex]
+  const base = current?.url ?? ""
   // Retries use a cache-busting param so the browser issues a genuinely new
   // request rather than replaying the stalled one.
-  const displaySrc = attempt === 0 ? currentBase : `${currentBase}${currentBase.includes("?") ? "&" : "?"}reload=${attempt}`
+  const displaySrc = attempt === 0 ? base : `${base}${base.includes("?") ? "&" : "?"}reload=${attempt}`
+
+  // Filename for the "Download full artwork" action, derived from the card name.
+  const ext = (src.split("?")[0].split(".").pop() || "png").toLowerCase()
+  const downloadName = `${(name || "artwork").replace(/[^a-z0-9._-]+/gi, "_").replace(/^_+|_+$/g, "") || "artwork"}.${ext}`
 
   if (!row) {
     return (
@@ -134,7 +152,7 @@ export function ImagePreview({ row, columns }: ImagePreviewProps) {
                 status === "loaded" ? "opacity-100" : "opacity-0"
               }`}
               onLoad={() => setStatus("loaded")}
-              onError={handleError}
+              onError={handleFailure}
             />
             {status === "loading" ? (
               <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
@@ -164,6 +182,16 @@ export function ImagePreview({ row, columns }: ImagePreviewProps) {
               </span>
             ))}
           </div>
+        ) : null}
+        {src ? (
+          <a
+            href={src}
+            download={downloadName}
+            className={buttonVariants({ variant: "outline", size: "sm", className: "mt-3 w-full" })}
+          >
+            <Download className="size-4" />
+            Download full artwork
+          </a>
         ) : null}
       </div>
     </div>
