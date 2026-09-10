@@ -1,11 +1,10 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { ImageOff, ImageIcon, Loader2, Download } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
 import { tagStyle } from "@/lib/tag-color"
 import { previewUrl, thumbnailUrl } from "@/lib/uploads"
-import { createPreviewBlob } from "@/lib/image-thumbnail"
 import type { CardRow, Column } from "@/lib/types"
 
 // Some artwork requests (especially the local uploads route) occasionally stall
@@ -49,9 +48,6 @@ export function ImagePreview({ row, columns }: ImagePreviewProps) {
   const [tierIndex, setTierIndex] = useState(0)
   const [attempt, setAttempt] = useState(0)
   const [status, setStatus] = useState<"loading" | "loaded" | "error">(src ? "loading" : "loaded")
-  // Tracks which originals we've already tried to backfill this session so a
-  // repeatedly-viewed older image doesn't re-upload its preview every time.
-  const backfilled = useRef<Set<string>>(new Set())
 
   // Reset the load lifecycle whenever the selected artwork changes.
   useEffect(() => {
@@ -60,34 +56,10 @@ export function ImagePreview({ row, columns }: ImagePreviewProps) {
     setStatus(src ? "loading" : "loaded")
   }, [src])
 
-  // Generate the missing preview in the browser and store it beside the
-  // original so subsequent views (and other users) get the fast path. Runs at
-  // most once per original per session; failures are silently ignored.
-  const backfillPreview = () => {
-    if (!src || !preview || backfilled.current.has(src)) return
-    backfilled.current.add(src)
-    void (async () => {
-      try {
-        const res = await fetch(src)
-        if (!res.ok) return
-        const blob = await createPreviewBlob(await res.blob())
-        if (!blob) return
-        const body = new FormData()
-        body.append("kind", "preview")
-        body.append("target", src)
-        body.append("preview", new File([blob], "preview.webp", { type: "image/webp" }))
-        await fetch("/api/uploads", { method: "POST", body })
-      } catch {
-        // best-effort optimization — ignore failures
-      }
-    })()
-  }
-
-  // Advance to the next (larger) display tier. When the preview tier fails it
-  // means no optimized file exists yet, so kick off a backfill for next time.
+  // Advance to the next (larger) display tier. The serve route generates the
+  // optimized preview on demand, so a failing preview tier just means it isn't
+  // ready this instant; the retry/fallback below covers it.
   const advanceTier = () => {
-    const failing = tiers[tierIndex]?.tier
-    if (failing === "preview") backfillPreview()
     setTierIndex((i) => i + 1)
     setAttempt(0)
     setStatus("loading")

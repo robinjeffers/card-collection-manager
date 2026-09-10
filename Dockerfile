@@ -1,14 +1,18 @@
 # syntax=docker/dockerfile:1
 
+# Debian "slim" (glibc) base rather than Alpine (musl): the sharp image
+# pipeline used for on-demand artwork optimization links native libraries that
+# are far more reliable on glibc.
+
 # ---- Dependencies ----
-FROM node:20-alpine AS deps
+FROM node:20-slim AS deps
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml* ./
 RUN pnpm install --frozen-lockfile || pnpm install
 
 # ---- Builder ----
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
 RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
@@ -17,7 +21,7 @@ COPY . .
 RUN pnpm build
 
 # ---- Runner ----
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000

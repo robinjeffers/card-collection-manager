@@ -20,9 +20,6 @@ export const MAX_TEMPLATE_BYTES = 100 * 1024 * 1024 // 100 MB
 /** Size cap for the small, client-generated grid thumbnail stored beside an image. */
 export const MAX_THUMBNAIL_BYTES = 1 * 1024 * 1024 // 1 MB
 
-/** Size cap for the client-generated preview image stored beside an image. */
-export const MAX_PREVIEW_BYTES = 3 * 1024 * 1024 // 3 MB
-
 /** Suffix + extension for the thumbnail stored beside a full image (`<id>.thumb.webp`). */
 export const THUMBNAIL_SUFFIX = ".thumb.webp"
 
@@ -112,10 +109,11 @@ export function thumbnailUrl(fullUrl: string): string | null {
 
 /**
  * Given a full-image URL we produced, return the conventional preview URL
- * stored beside it (`<uid>/<uuid>.preview.webp`). Same ownership/fallback rules
- * as {@link thumbnailUrl}: null for URLs we don't own, and the preview may not
- * exist yet for images uploaded before previews (or still being backfilled), so
- * callers must fall back to the full image if it 404s.
+ * stored beside it (`<uid>/<uuid>.preview.webp`). Same ownership rules as
+ * {@link thumbnailUrl}: null for URLs we don't own. The serve route generates
+ * this preview on demand with sharp the first time it's requested (and caches
+ * it), so it works for both new and pre-existing images; callers should still
+ * fall back to the full image if generation isn't possible.
  */
 export function previewUrl(fullUrl: string): string | null {
   return siblingUrl(fullUrl, PREVIEW_SUFFIX)
