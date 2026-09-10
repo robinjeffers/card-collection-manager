@@ -9,12 +9,14 @@ import {
   MAX_TEMPLATE_BYTES,
   MAX_THUMBNAIL_BYTES,
   MIME_EXTENSIONS,
+  PREVIEW_SUFFIX,
   TEMPLATE_EXTENSION_MIME,
   THUMBNAIL_SUFFIX,
   UPLOAD_DIR,
   fileExtension,
   sanitizeUploadName,
 } from "@/lib/uploads"
+import { writeDerivedForOriginal } from "@/lib/image-derive"
 
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -75,20 +77,33 @@ export async function POST(request: Request) {
 
   const id = randomUUID()
   const filename = `${id}.${ext}`
-  await writeFile(path.join(userRoot, filename), bytes)
+  const originalPath = path.join(userRoot, filename)
+  await writeFile(originalPath, bytes)
 
   // Optional client-generated thumbnail, stored beside the original as
-  // `<id>.thumb.webp`. The grid uses it for fast, low-memory rendering; a
-  // missing/invalid one is non-fatal — the serve route regenerates derived
-  // images (thumbnail and preview) on demand with sharp.
+  // `<id>.thumb.webp` for fast, low-memory grid rendering. A missing/invalid
+  // one is non-fatal — we regenerate a thumbnail server-side below.
+  let clientThumb = false
   const thumb = form.get("thumbnail")
   if (thumb instanceof File && thumb.type === "image/webp" && thumb.size > 0 && thumb.size <= MAX_THUMBNAIL_BYTES) {
     try {
       const thumbBytes = Buffer.from(await thumb.arrayBuffer())
       await writeFile(path.join(userRoot, `${id}${THUMBNAIL_SUFFIX}`), thumbBytes)
+      clientThumb = true
     } catch {
       // ignore — thumbnail is a pure optimization
     }
+  }
+
+  // Eagerly generate the optimized preview (and a thumbnail if the client
+  // didn't supply one) with sharp, so the detail panel's small WebP already
+  // exists on first view instead of racing a lazy build and falling back to the
+  // grid thumbnail or the multi-MB original. Non-fatal: the serve route still
+  // regenerates on demand if this fails.
+  try {
+    await writeDerivedForOriginal(originalPath, clientThumb ? [PREVIEW_SUFFIX] : [PREVIEW_SUFFIX, THUMBNAIL_SUFFIX])
+  } catch {
+    // ignore — on-demand generation is the safety net
   }
 
   return NextResponse.json({ url: `/api/uploads/${session.user.id}/${filename}` })

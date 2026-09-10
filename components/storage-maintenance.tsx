@@ -1,8 +1,8 @@
 "use client"
 
 import { useRef, useState, useTransition } from "react"
-import { Download, HardDrive, Loader2, RefreshCw, Trash2, Upload } from "lucide-react"
-import { cleanupOrphans, rescanStorage } from "@/app/actions/maintenance"
+import { Download, HardDrive, Loader2, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react"
+import { cleanupOrphans, optimizeArtwork, rescanStorage } from "@/app/actions/maintenance"
 import type { StorageCategory, StorageReport } from "@/lib/storage-report"
 import { Button } from "@/components/ui/button"
 import { Modal } from "@/components/ui/modal"
@@ -34,7 +34,7 @@ const CATEGORY_ORDER: StorageCategory[] = ["image", "preview", "thumbnail", "tem
 export function StorageMaintenance({ initialReport }: { initialReport: StorageReport }) {
   const [report, setReport] = useState(initialReport)
   const [pending, startTransition] = useTransition()
-  const [action, setAction] = useState<"rescan" | "cleanup" | null>(null)
+  const [action, setAction] = useState<"rescan" | "cleanup" | "optimize" | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -107,7 +107,7 @@ export function StorageMaintenance({ initialReport }: { initialReport: StorageRe
     }
   }
 
-  const run = (kind: "rescan" | "cleanup", fn: () => Promise<void>) => {
+  const run = (kind: "rescan" | "cleanup" | "optimize", fn: () => Promise<void>) => {
     setError(null)
     setNotice(null)
     setAction(kind)
@@ -136,6 +136,22 @@ export function StorageMaintenance({ initialReport }: { initialReport: StorageRe
         result.deleted === 0
           ? "No orphaned files needed removal."
           : `Removed ${result.deleted} orphaned file${result.deleted === 1 ? "" : "s"} and reclaimed ${formatBytes(result.bytes)}.`,
+      )
+    })
+
+  const optimize = () =>
+    run("optimize", async () => {
+      const { summary, report: fresh } = await optimizeArtwork()
+      setReport(fresh)
+      if (summary.processed === 0) {
+        setNotice("No artwork found to optimize.")
+        return
+      }
+      const failedNote = summary.failed > 0 ? ` ${summary.failed} could not be read and were skipped.` : ""
+      setNotice(
+        `Optimized ${summary.processed} image${summary.processed === 1 ? "" : "s"}: previews now total ` +
+          `${formatBytes(summary.previewBytes)} (down from ${formatBytes(summary.originalBytes)} of originals, ` +
+          `which are kept intact for downloads).${failedNote}`,
       )
     })
 
@@ -258,6 +274,21 @@ export function StorageMaintenance({ initialReport }: { initialReport: StorageRe
         >
           {pending && action === "cleanup" ? <Loader2 className="animate-spin" /> : <Trash2 />}
           Clean up
+        </Button>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-medium">Optimize artwork</h3>
+          <p className="text-sm text-muted-foreground">
+            Regenerate the small preview and grid thumbnail for every uploaded image at the current
+            quality. Fixes older or low-resolution previews and shrinks what the app loads. Your
+            full-resolution originals are never modified.
+          </p>
+        </div>
+        <Button variant="outline" onClick={optimize} disabled={pending} className="shrink-0">
+          {pending && action === "optimize" ? <Loader2 className="animate-spin" /> : <Sparkles />}
+          {pending && action === "optimize" ? "Optimizing…" : "Optimize"}
         </Button>
       </div>
 
