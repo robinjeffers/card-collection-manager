@@ -12,7 +12,11 @@ import type { CardRow, Column } from "@/lib/types"
 // element is remounted. We watchdog each load and retry a fresh request a few
 // times with a cache-busting param before falling back to the next tier.
 const MAX_RETRIES = 2
-const STALL_TIMEOUT_MS = 4000
+// Previews are normally generated eagerly (at upload and via admin "Optimize
+// artwork"), so they exist before the panel asks. This watchdog only matters
+// for the rare lazy build of an older upload; give sharp ample room so we don't
+// prematurely give up and drop to the tiny grid thumbnail.
+const STALL_TIMEOUT_MS = 9000
 
 // The panel is a lightweight visual reference, so we only ever *display* a
 // small image: the optimized preview WebP first, then the grid thumbnail. The

@@ -39,13 +39,19 @@ shape yourself:
   - **Number** — numeric stats (e.g. Strength, Faith) with proper numeric sorting.
   - **Tag** — a managed set of labels (e.g. `Tier 1`, `Unique`, `Spells`) that you pick from a
     dropdown. Tag options are shown alphabetically and are color-coded for quick scanning.
-  - **Image** — card artwork. Uploads are stored on disk, and a thumbnail is generated
-    automatically for the grid. One image column per collection is the "artwork" column that
-    feeds the large preview panel.
+  - **Image** — card artwork. Uploads are stored on disk at full resolution, and two smaller
+    web-optimized versions are generated automatically with [sharp](https://sharp.pixelplumbing.com/):
+    a tiny grid thumbnail and a larger preview for the detail panel. One image column per
+    collection is the "artwork" column that feeds the large preview panel.
   - **File** — an arbitrary attachment such as a print-ready template (`.afdesign`, `.psd`,
     `.pdf`, etc.), downloadable straight from the card.
 - **Inline editing.** Edit any cell directly in the grid, or open a card in a focused form
   dialog. A large preview panel shows the selected card's artwork at a comfortable size.
+- **Fast, web-optimized artwork.** The preview panel displays a compressed, right-sized version
+  of each image (typically a small fraction of the original's file size), so browsing stays fast
+  even over a remote tunnel. The optimized image is generated on the server and cached to disk;
+  the pristine full-resolution original is always available via the **Download full artwork**
+  button beneath the preview.
 - **Artwork + template pairing.** Each card can carry both its finished artwork and the source
   file used to produce it, keeping design assets attached to the data they belong to.
 
@@ -76,8 +82,11 @@ shape yourself:
   secure password hashing and session management.
 - **Invite-only** — admins create every account; there is no public self-service signup.
 - **Admin dashboard** at `/admin` for account management plus self-hosting maintenance tools:
-  - **Storage usage view** — a breakdown of disk usage by category (artwork, thumbnails,
-    templates) and by user.
+  - **Storage usage view** — a breakdown of disk usage by category (artwork, previews,
+    thumbnails, templates) and by user.
+  - **Optimize artwork** — (re)generates the web-optimized preview and grid thumbnail for every
+    uploaded image at the current quality settings. Useful after importing existing art or
+    upgrading the app; your full-resolution originals are never modified.
   - **Orphaned file cleanup** — safely deletes upload files no longer referenced by any card,
     with a grace period so in-progress uploads are never removed.
   - **Full backup** — download every collection and all its files as a single `.zip` (raw data
@@ -93,7 +102,10 @@ shape yourself:
 - **[Tailwind CSS](https://tailwindcss.com/)** for styling
 - **PostgreSQL** for data (card collections are stored as JSON documents)
 - **[Better Auth](https://www.better-auth.com/)** for authentication
-- **Docker** + **Docker Compose** for deployment
+- **[sharp](https://sharp.pixelplumbing.com/)** for server-side image optimization (previews and
+  thumbnails)
+- **Docker** + **Docker Compose** for deployment (Debian-based `node:20-slim` image, for reliable
+  sharp native binaries)
 - Uploaded files are stored on the filesystem (a mounted volume), **not** in the database
 
 ---
@@ -239,7 +251,7 @@ Two Docker volumes persist everything and survive restarts and `docker compose d
 | Volume         | Contents                                                            |
 | -------------- | ------------------------------------------------------------------- |
 | `db-data`      | Card collections, columns, tags, and text/number values (Postgres)  |
-| `uploads-data` | Card artwork, generated thumbnails, and uploaded template files     |
+| `uploads-data` | Card artwork (full-resolution originals), generated previews and thumbnails, and uploaded template files |
 
 To store this data at a specific location on the host (for example to back it up directly), you
 can replace either named volume with a bind mount. The `docker-compose.yml` file contains
