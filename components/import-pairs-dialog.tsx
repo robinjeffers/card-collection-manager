@@ -12,7 +12,7 @@ import {
   TEMPLATE_EXTENSION_MIME,
   fileExtension,
 } from "@/lib/uploads"
-import { createThumbnailBlob } from "@/lib/image-thumbnail"
+import { createPreviewBlob, createThumbnailBlob } from "@/lib/image-thumbnail"
 
 interface ImportPairsDialogProps {
   open: boolean
@@ -142,6 +142,8 @@ export function ImportPairsDialog({ open, onClose, onImport }: ImportPairsDialog
     } else {
       const thumb = await createThumbnailBlob(file)
       if (thumb) body.append("thumbnail", new File([thumb], "thumb.webp", { type: "image/webp" }))
+      const preview = await createPreviewBlob(file)
+      if (preview) body.append("preview", new File([preview], "preview.webp", { type: "image/webp" }))
     }
     const res = await fetch("/api/uploads", { method: "POST", body })
     if (!res.ok) {

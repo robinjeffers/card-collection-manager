@@ -4,7 +4,7 @@ import path from "path"
 import { db } from "@/lib/db"
 import { collection as collectionTable } from "@/lib/db/schema"
 import { user } from "@/lib/db/schema"
-import { EXTENSION_MIME, TEMPLATE_EXTENSION_MIME, THUMBNAIL_SUFFIX, UPLOAD_DIR } from "@/lib/uploads"
+import { EXTENSION_MIME, PREVIEW_SUFFIX, TEMPLATE_EXTENSION_MIME, THUMBNAIL_SUFFIX, UPLOAD_DIR } from "@/lib/uploads"
 import type { Collection } from "@/lib/types"
 
 const UPLOAD_PREFIX = "/api/uploads/"
@@ -17,7 +17,7 @@ const UPLOAD_PREFIX = "/api/uploads/"
  */
 const ORPHAN_GRACE_MS = 60 * 60 * 1000 // 1 hour
 
-export type StorageCategory = "image" | "thumbnail" | "template" | "other"
+export type StorageCategory = "image" | "preview" | "thumbnail" | "template" | "other"
 
 export interface StorageReport {
   totalBytes: number
@@ -73,10 +73,13 @@ export async function collectReferencedPaths(): Promise<Set<string>> {
         const abs = resolveRef(value, root)
         if (!abs) continue
         refs.add(abs)
-        // Derived thumbnail sibling: `<uuid>.<ext>` -> `<uuid>.thumb.webp`.
+        // Derived siblings: `<uuid>.<ext>` -> `<uuid>.thumb.webp` / `.preview.webp`.
+        // Marking them referenced keeps orphan cleanup from deleting the
+        // optimizations of a live image (and includes them in backups).
         const dot = abs.lastIndexOf(".")
         if (dot > abs.lastIndexOf(path.sep)) {
           refs.add(abs.slice(0, dot) + THUMBNAIL_SUFFIX)
+          refs.add(abs.slice(0, dot) + PREVIEW_SUFFIX)
         }
       }
       for (const colId of fileCols) {
@@ -118,6 +121,9 @@ async function walkFiles(dir: string): Promise<{ path: string; size: number; mti
 
 function categoryOf(file: string): StorageCategory {
   const base = path.basename(file).toLowerCase()
+  // Check preview before thumbnail: both end in `.webp`, so match the full
+  // derived suffix first.
+  if (base.endsWith(PREVIEW_SUFFIX)) return "preview"
   if (base.endsWith(THUMBNAIL_SUFFIX)) return "thumbnail"
   const ext = path.extname(base).slice(1)
   if (EXTENSION_MIME[ext]) return "image"
@@ -144,6 +150,7 @@ export async function buildStorageReport(): Promise<{ report: StorageReport; orp
 
   const categories: Record<StorageCategory, { bytes: number; files: number }> = {
     image: { bytes: 0, files: 0 },
+    preview: { bytes: 0, files: 0 },
     thumbnail: { bytes: 0, files: 0 },
     template: { bytes: 0, files: 0 },
     other: { bytes: 0, files: 0 },

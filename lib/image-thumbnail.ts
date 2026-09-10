@@ -3,6 +3,15 @@ export const THUMBNAIL_MAX_DIM = 256
 /** WebP quality for the generated thumbnail (0–1). */
 export const THUMBNAIL_QUALITY = 0.8
 
+/**
+ * Longest edge (px) of the medium "preview" image shown in the detail panel.
+ * Large enough to look crisp (including on hi-DPI displays for the ~480px
+ * panel) yet a small fraction of a multi-MB original's byte size.
+ */
+export const PREVIEW_MAX_DIM = 1024
+/** WebP quality for the generated preview (0–1). */
+export const PREVIEW_QUALITY = 0.82
+
 function loadHtmlImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image()
@@ -13,41 +22,45 @@ function loadHtmlImage(url: string): Promise<HTMLImageElement> {
 }
 
 /**
- * Downscale an uploaded image entirely in the browser and return a small WebP
- * blob suitable for the grid. Returns null when generation isn't possible
- * (non-image file, no canvas, decode failure) — callers should simply upload
- * without a thumbnail and let the grid fall back to the full image.
+ * Downscale an image entirely in the browser and return a WebP blob no larger
+ * than `maxDim` on its longest edge. Returns null when generation isn't
+ * possible (non-image input, no canvas, decode failure, or the source is
+ * already smaller than the target) — callers should fall back to the original.
  *
- * This keeps thumbnail work off the server: no native modules, nothing added
- * to the Docker image.
+ * This keeps all image resizing off the server: no native modules, nothing
+ * added to the Docker image.
  */
-export async function createThumbnailBlob(file: File): Promise<Blob | null> {
+export async function createResizedWebpBlob(
+  source: Blob,
+  maxDim: number,
+  quality: number,
+): Promise<Blob | null> {
   if (typeof window === "undefined" || typeof document === "undefined") return null
-  if (!file.type.startsWith("image/")) return null
+  if (!source.type.startsWith("image/")) return null
 
   let bitmap: ImageBitmap | null = null
   let objectUrl: string | null = null
   try {
     let width: number
     let height: number
-    let source: CanvasImageSource
+    let drawSource: CanvasImageSource
 
     if (typeof createImageBitmap === "function") {
-      bitmap = await createImageBitmap(file)
+      bitmap = await createImageBitmap(source)
       width = bitmap.width
       height = bitmap.height
-      source = bitmap
+      drawSource = bitmap
     } else {
-      objectUrl = URL.createObjectURL(file)
+      objectUrl = URL.createObjectURL(source)
       const img = await loadHtmlImage(objectUrl)
       width = img.naturalWidth
       height = img.naturalHeight
-      source = img
+      drawSource = img
     }
 
     if (!width || !height) return null
 
-    const scale = Math.min(1, THUMBNAIL_MAX_DIM / Math.max(width, height))
+    const scale = Math.min(1, maxDim / Math.max(width, height))
     const w = Math.max(1, Math.round(width * scale))
     const h = Math.max(1, Math.round(height * scale))
 
@@ -56,13 +69,30 @@ export async function createThumbnailBlob(file: File): Promise<Blob | null> {
     canvas.height = h
     const ctx = canvas.getContext("2d")
     if (!ctx) return null
-    ctx.drawImage(source, 0, 0, w, h)
+    ctx.drawImage(drawSource, 0, 0, w, h)
 
-    return await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", THUMBNAIL_QUALITY))
+    return await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", quality))
   } catch {
     return null
   } finally {
     if (bitmap) bitmap.close()
     if (objectUrl) URL.revokeObjectURL(objectUrl)
   }
+}
+
+/**
+ * Small WebP thumbnail for the grid. Returns null on any failure — callers
+ * should upload without a thumbnail and let the grid fall back to the full image.
+ */
+export function createThumbnailBlob(file: Blob): Promise<Blob | null> {
+  return createResizedWebpBlob(file, THUMBNAIL_MAX_DIM, THUMBNAIL_QUALITY)
+}
+
+/**
+ * Medium WebP preview for the detail panel. Generated at upload time and also
+ * backfilled on demand for older images. Returns null on any failure — callers
+ * should fall back to the full image.
+ */
+export function createPreviewBlob(file: Blob): Promise<Blob | null> {
+  return createResizedWebpBlob(file, PREVIEW_MAX_DIM, PREVIEW_QUALITY)
 }
