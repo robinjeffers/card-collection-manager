@@ -6,7 +6,7 @@ import { Modal } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/field"
 import { ACCEPT_ATTRIBUTE } from "@/lib/uploads"
-import { createPreviewBlob, createThumbnailBlob } from "@/lib/image-thumbnail"
+import { createThumbnailBlob } from "@/lib/image-thumbnail"
 
 interface ImportImagesDialogProps {
   open: boolean
@@ -92,8 +92,6 @@ export function ImportImagesDialog({ open, onClose, onImport }: ImportImagesDial
     body.append("file", item.file)
     const thumb = await createThumbnailBlob(item.file)
     if (thumb) body.append("thumbnail", new File([thumb], "thumb.webp", { type: "image/webp" }))
-    const preview = await createPreviewBlob(item.file)
-    if (preview) body.append("preview", new File([preview], "preview.webp", { type: "image/webp" }))
     const res = await fetch("/api/uploads", { method: "POST", body })
     if (!res.ok) {
       const data = (await res.json().catch(() => ({}))) as { error?: string }

@@ -3,6 +3,7 @@ import path from "path"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
+import { derivedSuffix, generateDerived } from "@/lib/image-derive"
 import { EXTENSION_MIME, TEMPLATE_EXTENSION_MIME, UPLOAD_DIR } from "@/lib/uploads"
 
 export async function GET(_request: Request, { params }: { params: Promise<{ path: string[] }> }) {
@@ -45,6 +46,21 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
     }
     return new NextResponse(new Uint8Array(data), { headers: responseHeaders })
   } catch {
+    // Not on disk. If this is a derived image (`.preview.webp`/`.thumb.webp`),
+    // generate it from the original on demand, cache it, and serve it. This is
+    // what optimizes pre-existing artwork the first time it's viewed, with no
+    // client-side work.
+    if (imageType && derivedSuffix(path.basename(resolved))) {
+      const generated = await generateDerived(resolved)
+      if (generated) {
+        return new NextResponse(new Uint8Array(generated), {
+          headers: {
+            "Content-Type": "image/webp",
+            "Cache-Control": "private, max-age=3600",
+          },
+        })
+      }
+    }
     return new NextResponse("Not found", { status: 404 })
   }
 }

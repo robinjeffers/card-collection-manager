@@ -2,6 +2,10 @@
 const nextConfig = {
   // Emit a self-contained server bundle for small production Docker images.
   output: "standalone",
+  // sharp ships native binaries; keep it external so Next traces and copies the
+  // real module (and its platform binaries) into the standalone output instead
+  // of trying to bundle it.
+  serverExternalPackages: ["sharp"],
   typescript: {
     ignoreBuildErrors: true,
   },

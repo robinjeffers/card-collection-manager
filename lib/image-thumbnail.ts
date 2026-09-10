@@ -3,15 +3,6 @@ export const THUMBNAIL_MAX_DIM = 256
 /** WebP quality for the generated thumbnail (0–1). */
 export const THUMBNAIL_QUALITY = 0.8
 
-/**
- * Longest edge (px) of the medium "preview" image shown in the detail panel.
- * Large enough to look crisp (including on hi-DPI displays for the ~480px
- * panel) yet a small fraction of a multi-MB original's byte size.
- */
-export const PREVIEW_MAX_DIM = 1024
-/** WebP quality for the generated preview (0–1). */
-export const PREVIEW_QUALITY = 0.82
-
 function loadHtmlImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image()
@@ -86,13 +77,4 @@ export async function createResizedWebpBlob(
  */
 export function createThumbnailBlob(file: Blob): Promise<Blob | null> {
   return createResizedWebpBlob(file, THUMBNAIL_MAX_DIM, THUMBNAIL_QUALITY)
-}
-
-/**
- * Medium WebP preview for the detail panel. Generated at upload time and also
- * backfilled on demand for older images. Returns null on any failure — callers
- * should fall back to the full image.
- */
-export function createPreviewBlob(file: Blob): Promise<Blob | null> {
-  return createResizedWebpBlob(file, PREVIEW_MAX_DIM, PREVIEW_QUALITY)
 }
