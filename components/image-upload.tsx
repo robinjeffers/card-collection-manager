@@ -3,7 +3,7 @@
 import { useRef, useState, type ChangeEvent } from "react"
 import { ImageIcon, Loader2, Upload } from "lucide-react"
 import { ACCEPT_ATTRIBUTE, thumbnailUrl } from "@/lib/uploads"
-import { createThumbnailBlob } from "@/lib/image-thumbnail"
+import { createPreviewBlob, createThumbnailBlob } from "@/lib/image-thumbnail"
 import { Modal } from "@/components/ui/modal"
 
 interface ImageUploadProps {
@@ -27,6 +27,8 @@ export function ImageUpload({ value, onChange, variant = "cell" }: ImageUploadPr
       body.append("file", file)
       const thumb = await createThumbnailBlob(file)
       if (thumb) body.append("thumbnail", new File([thumb], "thumb.webp", { type: "image/webp" }))
+      const preview = await createPreviewBlob(file)
+      if (preview) body.append("preview", new File([preview], "preview.webp", { type: "image/webp" }))
       const res = await fetch("/api/uploads", { method: "POST", body })
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string }

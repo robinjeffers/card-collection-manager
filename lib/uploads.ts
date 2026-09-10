@@ -20,8 +20,19 @@ export const MAX_TEMPLATE_BYTES = 100 * 1024 * 1024 // 100 MB
 /** Size cap for the small, client-generated grid thumbnail stored beside an image. */
 export const MAX_THUMBNAIL_BYTES = 1 * 1024 * 1024 // 1 MB
 
+/** Size cap for the client-generated preview image stored beside an image. */
+export const MAX_PREVIEW_BYTES = 3 * 1024 * 1024 // 3 MB
+
 /** Suffix + extension for the thumbnail stored beside a full image (`<id>.thumb.webp`). */
 export const THUMBNAIL_SUFFIX = ".thumb.webp"
+
+/**
+ * Suffix + extension for the medium "preview" image stored beside a full image
+ * (`<id>.preview.webp`). It's much smaller than the original (a downscaled
+ * WebP), so the detail preview panel loads fast even over a slow tunnel while
+ * the multi-MB original is reserved for downloads/exports.
+ */
+export const PREVIEW_SUFFIX = ".preview.webp"
 
 /** Allowed image upload MIME types mapped to the extension we store them under. */
 export const MIME_EXTENSIONS: Record<string, string> = {
@@ -96,11 +107,27 @@ export function sanitizeUploadName(filename: string): string {
  * it 404s.
  */
 export function thumbnailUrl(fullUrl: string): string | null {
+  return siblingUrl(fullUrl, THUMBNAIL_SUFFIX)
+}
+
+/**
+ * Given a full-image URL we produced, return the conventional preview URL
+ * stored beside it (`<uid>/<uuid>.preview.webp`). Same ownership/fallback rules
+ * as {@link thumbnailUrl}: null for URLs we don't own, and the preview may not
+ * exist yet for images uploaded before previews (or still being backfilled), so
+ * callers must fall back to the full image if it 404s.
+ */
+export function previewUrl(fullUrl: string): string | null {
+  return siblingUrl(fullUrl, PREVIEW_SUFFIX)
+}
+
+/** Shared helper: swap a full-image URL's extension for a derived-file suffix. */
+function siblingUrl(fullUrl: string, suffix: string): string | null {
   if (!fullUrl.startsWith("/api/uploads/")) return null
   const slash = fullUrl.lastIndexOf("/")
   const dir = fullUrl.slice(0, slash + 1)
   const file = fullUrl.slice(slash + 1)
   const dot = file.lastIndexOf(".")
   if (dot <= 0) return null
-  return `${dir}${file.slice(0, dot)}${THUMBNAIL_SUFFIX}`
+  return `${dir}${file.slice(0, dot)}${suffix}`
 }

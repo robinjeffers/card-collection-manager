@@ -23,12 +23,13 @@ function formatBytes(n: number): string {
 
 const CATEGORY_META: Record<StorageCategory, { label: string; bar: string; dot: string }> = {
   image: { label: "Artwork", bar: "bg-primary", dot: "bg-primary" },
-  thumbnail: { label: "Thumbnails", bar: "bg-primary/55", dot: "bg-primary/55" },
-  template: { label: "Templates", bar: "bg-primary/30", dot: "bg-primary/30" },
+  preview: { label: "Previews", bar: "bg-primary/70", dot: "bg-primary/70" },
+  thumbnail: { label: "Thumbnails", bar: "bg-primary/45", dot: "bg-primary/45" },
+  template: { label: "Templates", bar: "bg-primary/25", dot: "bg-primary/25" },
   other: { label: "Other", bar: "bg-muted-foreground/40", dot: "bg-muted-foreground/40" },
 }
 
-const CATEGORY_ORDER: StorageCategory[] = ["image", "thumbnail", "template", "other"]
+const CATEGORY_ORDER: StorageCategory[] = ["image", "preview", "thumbnail", "template", "other"]
 
 export function StorageMaintenance({ initialReport }: { initialReport: StorageReport }) {
   const [report, setReport] = useState(initialReport)
@@ -191,7 +192,7 @@ export function StorageMaintenance({ initialReport }: { initialReport: StorageRe
                 />
               ))}
             </div>
-            <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {CATEGORY_ORDER.map((c) => (
                 <li key={c} className="flex flex-col gap-1">
                   <span className="flex items-center gap-2 text-sm">
