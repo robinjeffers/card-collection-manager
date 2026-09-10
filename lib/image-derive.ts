@@ -166,25 +166,45 @@ export interface OptimizeSummary {
   thumbBytes: number
 }
 
+/** An empty summary to start accumulation from. */
+function emptySummary(): OptimizeSummary {
+  return { processed: 0, failed: 0, originalBytes: 0, previewBytes: 0, thumbBytes: 0 }
+}
+
 /**
- * Regenerate `.preview.webp` + `.thumb.webp` for every original image on disk,
- * overwriting existing derivatives at the current settings. This optimizes
- * pre-existing artwork in bulk and replaces any stale, lower-quality derivatives
- * from earlier client-side generation. Originals are never modified.
+ * List every original image as a path relative to UPLOAD_DIR. The admin
+ * "Optimize artwork" flow fetches this list, then submits it back in small
+ * batches so no single request runs long enough to hit a reverse-proxy timeout
+ * (e.g. Cloudflare Tunnel's ~100s cap).
  */
-export async function regenerateAllDerived(): Promise<OptimizeSummary> {
+export async function listOriginalRelPaths(): Promise<string[]> {
   const root = path.resolve(UPLOAD_DIR)
   const originals = await collectOriginals(root)
-  const summary: OptimizeSummary = {
-    processed: 0,
-    failed: 0,
-    originalBytes: 0,
-    previewBytes: 0,
-    thumbBytes: 0,
-  }
-  for (const original of originals) {
+  return originals.map((p) => path.relative(root, p))
+}
+
+/**
+ * Regenerate `.preview.webp` + `.thumb.webp` for a specific batch of originals,
+ * identified by paths relative to UPLOAD_DIR. Each path is validated to resolve
+ * inside UPLOAD_DIR and to be a real original image; anything else is counted as
+ * failed and skipped (defense against traversal or stale client input).
+ * Originals are never modified. Returns a summary for just this batch.
+ */
+export async function optimizeRelPaths(relPaths: string[]): Promise<OptimizeSummary> {
+  const root = path.resolve(UPLOAD_DIR)
+  const summary = emptySummary()
+  for (const rel of relPaths) {
+    const abs = path.resolve(root, rel)
+    if (abs !== root && !abs.startsWith(root + path.sep)) {
+      summary.failed += 1
+      continue
+    }
+    if (!isOriginalImage(path.basename(abs))) {
+      summary.failed += 1
+      continue
+    }
     try {
-      const [s, written] = await Promise.all([stat(original), writeDerivedForOriginal(original)])
+      const [s, written] = await Promise.all([stat(abs), writeDerivedForOriginal(abs)])
       summary.processed += 1
       summary.originalBytes += s.size
       summary.previewBytes += written[PREVIEW_SUFFIX] ?? 0

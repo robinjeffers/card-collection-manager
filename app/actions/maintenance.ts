@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { requireAdmin } from "@/lib/admin"
-import { regenerateAllDerived, type OptimizeSummary } from "@/lib/image-derive"
+import { listOriginalRelPaths, optimizeRelPaths, type OptimizeSummary } from "@/lib/image-derive"
 import { buildStorageReport, deleteOrphanFiles, type StorageReport } from "@/lib/storage-report"
 
 /** Re-scan disk + DB and return a fresh storage report (admin only). */
@@ -22,14 +22,21 @@ export async function cleanupOrphans(): Promise<{ deleted: number; bytes: number
 }
 
 /**
- * (Re)generate the optimized preview + thumbnail for every uploaded image,
- * overwriting stale or lower-quality derivatives. Originals are left untouched.
- * Returns a summary plus a fresh storage report.
+ * List every uploaded original image (as paths relative to the uploads root) so
+ * the client can optimize them in small batches. Admin only.
  */
-export async function optimizeArtwork(): Promise<{ summary: OptimizeSummary; report: StorageReport }> {
+export async function listArtworkToOptimize(): Promise<{ paths: string[] }> {
   await requireAdmin()
-  const summary = await regenerateAllDerived()
-  const { report } = await buildStorageReport()
-  revalidatePath("/admin")
-  return { summary, report }
+  return { paths: await listOriginalRelPaths() }
+}
+
+/**
+ * (Re)generate the optimized preview + thumbnail for one batch of images,
+ * overwriting stale or lower-quality derivatives. Originals are left untouched.
+ * Kept small and driven by the browser so a single request never runs long
+ * enough to hit a reverse-proxy timeout. Returns a summary for this batch.
+ */
+export async function optimizeArtworkBatch(paths: string[]): Promise<{ summary: OptimizeSummary }> {
+  await requireAdmin()
+  return { summary: await optimizeRelPaths(paths) }
 }
