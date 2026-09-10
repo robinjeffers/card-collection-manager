@@ -78,15 +78,22 @@ export function CollectionManager({
   const templateCol = collection.columns.find((c) => c.type === "file")
 
   const filteredRows = useMemo(() => {
-    return collection.rows.filter((row) => {
-      const name = String(row.values.name ?? "").toLowerCase()
-      if (search && !name.includes(search.toLowerCase())) return false
-      if (activeTags.length > 0) {
-        const rowTags = tagCol && Array.isArray(row.values[tagCol.id]) ? (row.values[tagCol.id] as string[]) : []
-        if (!activeTags.every((t) => rowTags.includes(t))) return false
-      }
-      return true
-    })
+    return collection.rows
+      .filter((row) => {
+        const name = String(row.values.name ?? "").toLowerCase()
+        if (search && !name.includes(search.toLowerCase())) return false
+        if (activeTags.length > 0) {
+          const rowTags = tagCol && Array.isArray(row.values[tagCol.id]) ? (row.values[tagCol.id] as string[]) : []
+          if (!activeTags.every((t) => rowTags.includes(t))) return false
+        }
+        return true
+      })
+      .sort((a, b) =>
+        String(a.values.name ?? "").localeCompare(String(b.values.name ?? ""), undefined, {
+          sensitivity: "base",
+          numeric: true,
+        }),
+      )
   }, [collection.rows, search, activeTags, tagCol])
 
   const selectedRow = collection.rows.find((r) => r.id === selectedId) ?? null

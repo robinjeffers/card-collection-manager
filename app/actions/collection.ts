@@ -73,21 +73,23 @@ function normalizeCollection(data: Collection): { data: Collection; changed: boo
   return { data: changed ? { ...data, columns } : data, changed }
 }
 
-/** Every collection (shared across all users), oldest first, with a card count. */
+/** Every collection (shared across all users), alphabetized by name, with a card count. */
 export async function listCollections(): Promise<CollectionSummary[]> {
   await getUserId()
   const rows = await db.select().from(collectionTable).orderBy(asc(collectionTable.createdAt))
 
-  return rows.map((r) => {
-    const data = isCollection(r.data) ? r.data : null
-    return {
-      id: r.id,
-      name: r.name,
-      cardCount: data ? data.rows.length : 0,
-      bannerUrl: data && typeof data.banner === "string" && data.banner ? data.banner : null,
-      updatedAt: r.updatedAt ? new Date(r.updatedAt).toISOString() : null,
-    }
-  })
+  return rows
+    .map((r) => {
+      const data = isCollection(r.data) ? r.data : null
+      return {
+        id: r.id,
+        name: r.name,
+        cardCount: data ? data.rows.length : 0,
+        bannerUrl: data && typeof data.banner === "string" && data.banner ? data.banner : null,
+        updatedAt: r.updatedAt ? new Date(r.updatedAt).toISOString() : null,
+      }
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }))
 }
 
 /** A single collection by id (shared across users), or null if it's missing. */
