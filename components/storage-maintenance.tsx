@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react"
 import { Download, HardDrive, Loader2, RefreshCw, Sparkles, Trash2, Upload } from "lucide-react"
-import { cleanupOrphans, optimizeArtwork, rescanStorage } from "@/app/actions/maintenance"
+import { cleanupOrphans, listArtworkToOptimize, optimizeArtworkBatch, rescanStorage } from "@/app/actions/maintenance"
 import type { StorageCategory, StorageReport } from "@/lib/storage-report"
 import { Button } from "@/components/ui/button"
 import { Modal } from "@/components/ui/modal"
@@ -34,11 +34,13 @@ const CATEGORY_ORDER: StorageCategory[] = ["image", "preview", "thumbnail", "tem
 export function StorageMaintenance({ initialReport }: { initialReport: StorageReport }) {
   const [report, setReport] = useState(initialReport)
   const [pending, startTransition] = useTransition()
-  const [action, setAction] = useState<"rescan" | "cleanup" | "optimize" | null>(null)
+  const [action, setAction] = useState<"rescan" | "cleanup" | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [backingUp, setBackingUp] = useState(false)
+  const [optimizing, setOptimizing] = useState(false)
+  const [optimizeProgress, setOptimizeProgress] = useState<{ done: number; total: number } | null>(null)
   const [restoring, setRestoring] = useState(false)
   const [restoreFile, setRestoreFile] = useState<File | null>(null)
   const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false)
@@ -107,7 +109,7 @@ export function StorageMaintenance({ initialReport }: { initialReport: StorageRe
     }
   }
 
-  const run = (kind: "rescan" | "cleanup" | "optimize", fn: () => Promise<void>) => {
+  const run = (kind: "rescan" | "cleanup", fn: () => Promise<void>) => {
     setError(null)
     setNotice(null)
     setAction(kind)
@@ -139,21 +141,49 @@ export function StorageMaintenance({ initialReport }: { initialReport: StorageRe
       )
     })
 
-  const optimize = () =>
-    run("optimize", async () => {
-      const { summary, report: fresh } = await optimizeArtwork()
-      setReport(fresh)
-      if (summary.processed === 0) {
+  // Optimize in small browser-driven batches: each request handles only a
+  // handful of images, so a single call never runs long enough to trip a
+  // reverse-proxy timeout (e.g. Cloudflare Tunnel's ~100s cap), and the user
+  // sees live progress instead of one opaque long request.
+  const optimize = async () => {
+    const BATCH_SIZE = 12
+    setError(null)
+    setNotice(null)
+    setOptimizing(true)
+    setOptimizeProgress({ done: 0, total: 0 })
+    try {
+      const { paths } = await listArtworkToOptimize()
+      if (paths.length === 0) {
         setNotice("No artwork found to optimize.")
         return
       }
-      const failedNote = summary.failed > 0 ? ` ${summary.failed} could not be read and were skipped.` : ""
+      setOptimizeProgress({ done: 0, total: paths.length })
+      const totals = { processed: 0, failed: 0, originalBytes: 0, previewBytes: 0, thumbBytes: 0 }
+      for (let i = 0; i < paths.length; i += BATCH_SIZE) {
+        const batch = paths.slice(i, i + BATCH_SIZE)
+        const { summary } = await optimizeArtworkBatch(batch)
+        totals.processed += summary.processed
+        totals.failed += summary.failed
+        totals.originalBytes += summary.originalBytes
+        totals.previewBytes += summary.previewBytes
+        totals.thumbBytes += summary.thumbBytes
+        setOptimizeProgress({ done: Math.min(i + batch.length, paths.length), total: paths.length })
+      }
+      const fresh = await rescanStorage()
+      setReport(fresh)
+      const failedNote = totals.failed > 0 ? ` ${totals.failed} could not be read and were skipped.` : ""
       setNotice(
-        `Optimized ${summary.processed} image${summary.processed === 1 ? "" : "s"}: previews now total ` +
-          `${formatBytes(summary.previewBytes)} (down from ${formatBytes(summary.originalBytes)} of originals, ` +
+        `Optimized ${totals.processed} image${totals.processed === 1 ? "" : "s"}: previews now total ` +
+          `${formatBytes(totals.previewBytes)} (down from ${formatBytes(totals.originalBytes)} of originals, ` +
           `which are kept intact for downloads).${failedNote}`,
       )
-    })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Optimization failed")
+    } finally {
+      setOptimizing(false)
+      setOptimizeProgress(null)
+    }
+  }
 
   const segments = CATEGORY_ORDER.filter((c) => report.categories[c].bytes > 0)
   const showPerUser = report.perUser.length > 1
@@ -277,19 +307,39 @@ export function StorageMaintenance({ initialReport }: { initialReport: StorageRe
         </Button>
       </div>
 
-      <div className="mt-4 flex flex-col gap-3 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h3 className="text-sm font-medium">Optimize artwork</h3>
-          <p className="text-sm text-muted-foreground">
-            Regenerate the small preview and grid thumbnail for every uploaded image at the current
-            quality. Fixes older or low-resolution previews and shrinks what the app loads. Your
-            full-resolution originals are never modified.
-          </p>
+      <div className="mt-4 flex flex-col gap-3 rounded-xl border border-border p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-sm font-medium">Optimize artwork</h3>
+            <p className="text-sm text-muted-foreground">
+              Regenerate the small preview and grid thumbnail for every uploaded image at the
+              current quality. Runs in small batches so it works reliably even over a remote tunnel.
+              Fixes older or low-resolution previews and shrinks what the app loads. Your
+              full-resolution originals are never modified.
+            </p>
+          </div>
+          <Button variant="outline" onClick={optimize} disabled={pending || optimizing} className="shrink-0">
+            {optimizing ? <Loader2 className="animate-spin" /> : <Sparkles />}
+            {optimizing ? "Optimizing…" : "Optimize"}
+          </Button>
         </div>
-        <Button variant="outline" onClick={optimize} disabled={pending} className="shrink-0">
-          {pending && action === "optimize" ? <Loader2 className="animate-spin" /> : <Sparkles />}
-          {pending && action === "optimize" ? "Optimizing…" : "Optimize"}
-        </Button>
+        {optimizeProgress ? (
+          <div className="flex flex-col gap-1.5" role="status" aria-live="polite">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full bg-primary transition-all duration-300"
+                style={{
+                  width: `${optimizeProgress.total ? (optimizeProgress.done / optimizeProgress.total) * 100 : 0}%`,
+                }}
+              />
+            </div>
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {optimizeProgress.total === 0
+                ? "Scanning artwork…"
+                : `Optimizing ${optimizeProgress.done} of ${optimizeProgress.total} images…`}
+            </span>
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-4 flex flex-col gap-3 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between">
