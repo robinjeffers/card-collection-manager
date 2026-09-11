@@ -74,7 +74,10 @@ shape yourself:
 ### Working with large collections
 
 - **Row virtualization** keeps the grid fast even with thousands of cards — only the visible
-  rows are rendered.
+  rows (plus a small overscan) are rendered, and thumbnails load lazily as rows scroll into
+  view. The overscan is kept intentionally small so that on a remote connection (e.g. a
+  Cloudflare Tunnel) the browser doesn't fire a wide burst of thumbnail requests that the tunnel
+  then has to serialize on its origin hop.
 - **Search and filter** by name, and filter by tags.
 - **Bulk operations** — select multiple cards (or all of them) to:
   - **Bulk edit** one field across every selected card (set a text/number value, or add /

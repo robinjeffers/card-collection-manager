@@ -120,7 +120,10 @@ export function DataGrid({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 49,
-    overscan: 12,
+    // Keep overscan small: native lazy-loading eagerly fetches thumbnails for
+    // rows within its pre-fetch margin, so a large overscan widens the burst of
+    // image requests the Cloudflare Tunnel has to serialize on its origin hop.
+    overscan: 4,
     // Key by row id so measurements stay correct across sort/filter changes.
     getItemKey: (index) => rows[index]?.id ?? index,
   })
