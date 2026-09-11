@@ -75,9 +75,19 @@ shape yourself:
 
 - **Row virtualization** keeps the grid fast even with thousands of cards — only the visible
   rows (plus a small overscan) are rendered, and thumbnails load lazily as rows scroll into
-  view. The overscan is kept intentionally small so that on a remote connection (e.g. a
-  Cloudflare Tunnel) the browser doesn't fire a wide burst of thumbnail requests that the tunnel
-  then has to serialize on its origin hop.
+  view. The overscan is kept intentionally small so that on a remote connection the browser
+  doesn't fire a wide burst of thumbnail requests all at once.
+
+  > **Serving remotely — avoid Cloudflare Tunnel for image-heavy use.** Thumbnails may load
+  > slowly or intermittently appear blank when the app is accessed through a **Cloudflare
+  > Tunnel**, because the tunnel proxies each of the many per-card image requests individually
+  > over its origin hop, serializing them and adding latency. The app itself is fast (loading
+  > directly on the server shows no delay), so this is a transport-layer limitation of the
+  > tunnel rather than an application bug. **A standard reverse proxy (e.g. Caddy, nginx, or
+  > Traefik) is strongly recommended instead** — it resolves the slow/blank thumbnail behavior
+  > entirely. If you must use a Cloudflare Tunnel, enabling Cloudflare edge caching on the
+  > tunnel hostname (thumbnails are served with long-lived, immutable cache headers) mitigates
+  > repeat-view latency but will not match a direct reverse proxy.
 - **Search and filter** by name, and filter by tags.
 - **Bulk operations** — select multiple cards (or all of them) to:
   - **Bulk edit** one field across every selected card (set a text/number value, or add /
