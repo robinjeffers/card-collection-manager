@@ -41,11 +41,22 @@ export function derivedSuffix(filename: string): string | null {
 /** Resize + re-encode an original image's bytes to a derived WebP for `suffix`. */
 async function encodeDerived(input: Buffer, suffix: string): Promise<Buffer> {
   const size = SIZES[suffix]
-  return sharp(input, { failOn: "none", animated: false })
+  const out = await sharp(input, {
+    failOn: "none",
+    animated: false,
+    // Card source art can be very high-resolution; don't reject large images on
+    // sharp's default ~268MP pixel cap, which would otherwise leave a card with
+    // no preview/thumbnail (appearing blank).
+    limitInputPixels: false,
+  })
     .rotate() // honor EXIF orientation before stripping metadata
     .resize({ width: size.maxDim, height: size.maxDim, fit: "inside", withoutEnlargement: true })
     .webp({ quality: size.quality, effort: size.effort })
     .toBuffer()
+  // Never persist an empty/failed encode: an on-disk 0-byte derived file would
+  // serve as a broken (blank) image forever instead of falling back.
+  if (!out || out.length === 0) throw new Error("empty derived output")
+  return out
 }
 
 /** Write `bytes` to `dest` atomically so concurrent readers never see a partial file. */

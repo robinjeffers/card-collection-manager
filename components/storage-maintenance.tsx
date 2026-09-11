@@ -82,31 +82,29 @@ export function StorageMaintenance({ initialReport }: { initialReport: StorageRe
     }
   }
 
-  const downloadBackup = async () => {
+  // Trigger the backup as a direct browser download (navigation to the route,
+  // which responds with `Content-Disposition: attachment`). The server streams
+  // the zip and the browser writes it straight to disk, so neither side has to
+  // hold a multi-GB archive in memory — unlike a `fetch()` + `blob()` which
+  // buffers the whole file and fails for large libraries.
+  const downloadBackup = () => {
     setError(null)
     setNotice(null)
     setBackingUp(true)
-    try {
-      const res = await fetch("/api/admin/backup")
-      if (!res.ok) throw new Error(`Backup failed (${res.status})`)
-      const blob = await res.blob()
-      const disposition = res.headers.get("Content-Disposition") ?? ""
-      const match = disposition.match(/filename="([^"]+)"/)
-      const filename = match?.[1] ?? "ccm-backup.zip"
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
-      setNotice(`Backup downloaded (${formatBytes(blob.size)}).`)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Backup failed")
-    } finally {
+    const iframe = document.createElement("iframe")
+    iframe.style.display = "none"
+    iframe.src = "/api/admin/backup"
+    document.body.appendChild(iframe)
+    // We can't observe when a native download finishes; re-enable the button
+    // shortly after kicking it off and leave the download running in the
+    // background.
+    window.setTimeout(() => {
       setBackingUp(false)
-    }
+      setNotice(
+        "Your backup download has started. A large library can take a while and downloads in the background — you can keep working.",
+      )
+      window.setTimeout(() => iframe.remove(), 60_000)
+    }, 2_000)
   }
 
   const run = (kind: "rescan" | "cleanup", fn: () => Promise<void>) => {

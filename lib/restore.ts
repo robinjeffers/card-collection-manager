@@ -33,7 +33,7 @@ export interface RestoreResult {
 }
 
 /**
- * Restore a backup produced by {@link buildFullBackup}. This is a MERGE, not a
+ * Restore a backup produced by {@link streamFullBackup}. This is a MERGE, not a
  * wipe: collections are upserted by id (added or overwritten) and files are
  * written back into UPLOAD_DIR, but nothing already present that isn't in the
  * backup is deleted. Safe to run against an empty instance (disaster recovery)
