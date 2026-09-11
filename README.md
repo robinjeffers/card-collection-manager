@@ -54,11 +54,14 @@ shape yourself:
   button beneath the preview.
 - **Seamless image loading.** The authenticated file route validates a cached, signed session
   cookie instead of a database lookup on every request, so a collection with hundreds of cards
-  no longer serializes its thumbnail loads behind per-request session queries. Derived thumbnails
-  and previews are served with long-lived, revalidating cache headers (with `ETag`/`304` support),
-  so once an image has loaded it appears instantly on repeat views and scroll-backs. Grid cells
-  show a subtle skeleton while loading, fade the image in when ready, and self-heal a stalled
-  request.
+  no longer serializes its thumbnail loads behind per-request session queries. On-demand image
+  encoding (sharp) is capped so it can't monopolize the Node worker threadpool that also serves
+  file reads — a burst of un-optimized cards scrolling into view can no longer stall the
+  already-optimized thumbnails around them. Derived thumbnails and previews are served with
+  long-lived, revalidating cache headers (with `ETag`/`304` support) and are requested with a
+  single stable URL (no cache-busting retries that would force the server to redo work), so once
+  an image has loaded it appears instantly on repeat views and scroll-backs. Grid cells show a
+  subtle skeleton while loading and fade the image in when ready.
 - **Artwork + template pairing.** Each card can carry both its finished artwork and the source
   file used to produce it, keeping design assets attached to the data they belong to.
 
