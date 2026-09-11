@@ -72,8 +72,26 @@ export function CollectionManager({
     (c) => (c.type === "text" && c.id !== "name") || c.type === "number" || c.type === "tag",
   )
 
-  const tagCol = collection.columns.find((c) => c.type === "tag")
-  const allTagOptions = tagCol?.options ?? []
+  const tagCols = useMemo(
+    () => collection.columns.filter((c) => c.type === "tag"),
+    [collection.columns],
+  )
+  // Filter chips draw from every tag column, not just the first. Options are
+  // deduped by name (first occurrence wins) and each chip keeps its source
+  // column's option list so its color matches the grid cell it came from.
+  const tagChips = useMemo(() => {
+    const seen = new Set<string>()
+    const chips: { tag: string; options: string[] }[] = []
+    for (const col of tagCols) {
+      const options = col.options ?? []
+      for (const opt of options) {
+        if (seen.has(opt)) continue
+        seen.add(opt)
+        chips.push({ tag: opt, options })
+      }
+    }
+    return chips
+  }, [tagCols])
   const artworkCol = collection.columns.find((c) => c.isArtwork) ?? collection.columns.find((c) => c.type === "image")
   const templateCol = collection.columns.find((c) => c.type === "file")
 
@@ -83,7 +101,13 @@ export function CollectionManager({
         const name = String(row.values.name ?? "").toLowerCase()
         if (search && !name.includes(search.toLowerCase())) return false
         if (activeTags.length > 0) {
-          const rowTags = tagCol && Array.isArray(row.values[tagCol.id]) ? (row.values[tagCol.id] as string[]) : []
+          // Gather the row's tags across every tag column so a chip matches
+          // whichever column actually holds it.
+          const rowTags: string[] = []
+          for (const col of tagCols) {
+            const v = row.values[col.id]
+            if (Array.isArray(v)) rowTags.push(...(v as string[]))
+          }
           if (!activeTags.every((t) => rowTags.includes(t))) return false
         }
         return true
@@ -94,7 +118,7 @@ export function CollectionManager({
           numeric: true,
         }),
       )
-  }, [collection.rows, search, activeTags, tagCol])
+  }, [collection.rows, search, activeTags, tagCols])
 
   const selectedRow = collection.rows.find((r) => r.id === selectedId) ?? null
 
@@ -233,16 +257,16 @@ export function CollectionManager({
                 className={cn(fieldClass, "pl-9")}
               />
             </div>
-            {allTagOptions.length > 0 ? (
+            {tagChips.length > 0 ? (
               <div className="flex flex-wrap gap-1.5">
-                {allTagOptions.map((tag) => {
+                {tagChips.map(({ tag, options }) => {
                   const active = activeTags.includes(tag)
                   return (
                     <button
                       key={tag}
                       type="button"
                       onClick={() => toggleTagFilter(tag)}
-                      style={active ? tagStyle(tag, allTagOptions) : undefined}
+                      style={active ? tagStyle(tag, options) : undefined}
                       className={cn(
                         "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium transition-colors",
                         active ? "" : "border-border text-muted-foreground hover:text-foreground",
