@@ -38,7 +38,10 @@ shape yourself:
   - **Text** — free-form text (e.g. card name, flavor text).
   - **Number** — numeric stats (e.g. Strength, Faith) with proper numeric sorting.
   - **Tag** — a managed set of labels (e.g. `Tier 1`, `Unique`, `Spells`) that you pick from a
-    dropdown. Tag options are shown alphabetically and are color-coded for quick scanning.
+    dropdown. Tag options are shown alphabetically and are color-coded for quick scanning. A
+    collection can have multiple tag columns (e.g. `Deck` and `Handed`), and the tag filter spans
+    every one of them — each column's labels appear as filter chips and a card matches when the
+    selected tags are found across any of its tag columns.
   - **Image** — card artwork. Uploads are stored on disk at full resolution, and two smaller
     web-optimized versions are generated automatically with [sharp](https://sharp.pixelplumbing.com/):
     a tiny grid thumbnail and a larger preview for the detail panel. One image column per
@@ -61,7 +64,10 @@ shape yourself:
   long-lived, revalidating cache headers (with `ETag`/`304` support) and are requested with a
   single stable URL (no cache-busting retries that would force the server to redo work), so once
   an image has loaded it appears instantly on repeat views and scroll-backs. Grid cells show a
-  subtle skeleton while loading and fade the image in when ready.
+  subtle skeleton while loading and fade the image in when ready. For diagnosing slow loads on a
+  specific deployment, the authenticated file route logs a timing breakdown (auth, disk stat,
+  file read, and any on-demand encoding) for any request that exceeds ~300ms — visible via
+  `docker compose logs -f app` — so the source of a stall can be pinpointed rather than guessed.
 - **Artwork + template pairing.** Each card can carry both its finished artwork and the source
   file used to produce it, keeping design assets attached to the data they belong to.
 
