@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, type ChangeEvent } from "react"
+import { useEffect, useRef, useState, type ChangeEvent } from "react"
 import { ImageIcon, Loader2, Upload } from "lucide-react"
 import { ACCEPT_ATTRIBUTE, thumbnailUrl } from "@/lib/uploads"
 import { createThumbnailBlob } from "@/lib/image-thumbnail"
@@ -238,25 +238,51 @@ export function ImageUpload({ value, onChange, variant = "cell" }: ImageUploadPr
 /**
  * Small grid preview image. Loads the lightweight thumbnail when one exists and
  * lazily (only when scrolled into view), falling back to the full image for
- * older uploads that predate thumbnails or external URLs.
+ * older uploads that predate thumbnails or external URLs. A skeleton shows
+ * until the image paints, and a stalled request (fires neither load nor error)
+ * self-heals with a cache-busting retry so a cell never sits blank.
  */
 function GridThumb({ src }: { src: string }) {
   const thumb = thumbnailUrl(src)
   const [thumbFailed, setThumbFailed] = useState(false)
-  const shown = thumb && !thumbFailed ? thumb : src
+  const [loaded, setLoaded] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+
+  const base = thumb && !thumbFailed ? thumb : src
+  const shown = attempt === 0 ? base : `${base}${base.includes("?") ? "&" : "?"}reload=${attempt}`
+
+  useEffect(() => {
+    if (loaded) return
+    const timer = setTimeout(() => {
+      if (attempt < 1) setAttempt((a) => a + 1)
+      else if (thumb && !thumbFailed) setThumbFailed(true)
+    }, 8000)
+    return () => clearTimeout(timer)
+  }, [loaded, attempt, thumb, thumbFailed])
+
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={shown || "/placeholder.svg"}
-      alt=""
-      className="size-full object-cover"
-      loading="lazy"
-      decoding="async"
-      width={72}
-      height={72}
-      onError={() => {
-        if (thumb && !thumbFailed) setThumbFailed(true)
-      }}
-    />
+    <>
+      {!loaded ? <span className="absolute inset-0 animate-pulse bg-muted" aria-hidden="true" /> : null}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        key={shown}
+        src={shown || "/placeholder.svg"}
+        alt=""
+        className={`size-full object-cover transition-opacity duration-200 ${loaded ? "opacity-100" : "opacity-0"}`}
+        loading="lazy"
+        decoding="async"
+        width={72}
+        height={72}
+        onLoad={() => setLoaded(true)}
+        onError={() => {
+          if (thumb && !thumbFailed) {
+            setThumbFailed(true)
+            setLoaded(false)
+          } else {
+            setLoaded(true)
+          }
+        }}
+      />
+    </>
   )
 }

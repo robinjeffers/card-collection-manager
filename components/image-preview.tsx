@@ -119,19 +119,31 @@ export function ImagePreview({ row, columns }: ImagePreviewProps) {
       <div className="relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/30">
         {src && status !== "error" ? (
           <>
+            {/* Instant low-res placeholder: the grid thumbnail is tiny and
+                usually already cached, so it paints immediately and avoids an
+                empty box while the larger preview loads. */}
+            {thumb ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={thumb}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 z-0 size-full scale-105 object-contain blur-md"
+              />
+            ) : null}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               key={displaySrc}
               src={displaySrc || "/placeholder.svg"}
               alt={name || "Card artwork"}
-              className={`max-h-full max-w-full object-contain transition-opacity duration-200 ${
+              className={`relative z-10 max-h-full max-w-full object-contain transition-opacity duration-200 ${
                 status === "loaded" ? "opacity-100" : "opacity-0"
               }`}
               onLoad={() => setStatus("loaded")}
               onError={handleFailure}
             />
             {status === "loading" ? (
-              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+              <div className="absolute inset-0 z-20 flex items-center justify-center text-muted-foreground">
                 <Loader2 className="size-6 animate-spin" />
                 <span className="sr-only">Loading artwork…</span>
               </div>

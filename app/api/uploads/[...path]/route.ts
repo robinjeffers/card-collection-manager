@@ -1,4 +1,4 @@
-import { readFile } from "fs/promises"
+import { readFile, stat } from "fs/promises"
 import path from "path"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
@@ -6,7 +6,7 @@ import { auth } from "@/lib/auth"
 import { derivedSuffix, generateDerived } from "@/lib/image-derive"
 import { EXTENSION_MIME, TEMPLATE_EXTENSION_MIME, UPLOAD_DIR } from "@/lib/uploads"
 
-export async function GET(_request: Request, { params }: { params: Promise<{ path: string[] }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ path: string[] }> }) {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) {
     return new NextResponse("Unauthorized", { status: 401 })
@@ -32,11 +32,29 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
     return new NextResponse("Unsupported", { status: 415 })
   }
 
+  const isDerived = Boolean(imageType && derivedSuffix(path.basename(resolved)))
+  // Derived thumbnails/previews are tiny and content-stable, so cache them hard
+  // with stale-while-revalidate: repeat views are instant, and a re-optimize
+  // (new mtime -> new ETag) is picked up on the next background revalidation.
+  // Originals get a shorter window since they're only ever the download target.
+  const cacheControl = isDerived
+    ? "private, max-age=86400, stale-while-revalidate=2592000"
+    : "private, max-age=3600, stale-while-revalidate=86400"
+
   try {
+    // ETag from size+mtime lets the browser revalidate with a cheap 304 instead
+    // of resending the bytes, which keeps scrolling back through the grid snappy.
+    const st = await stat(resolved)
+    const etag = `W/"${st.size.toString(16)}-${Math.round(st.mtimeMs).toString(16)}"`
+    if (request.headers.get("if-none-match") === etag) {
+      return new NextResponse(null, { status: 304, headers: { ETag: etag, "Cache-Control": cacheControl } })
+    }
+
     const data = await readFile(resolved)
     const responseHeaders: Record<string, string> = {
       "Content-Type": imageType ?? templateType,
-      "Cache-Control": "private, max-age=3600",
+      "Cache-Control": cacheControl,
+      ETag: etag,
     }
     // Template/source files are always sent as a download, never rendered
     // inline (this also neutralizes any SVG script content).
@@ -56,7 +74,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ pat
         return new NextResponse(new Uint8Array(generated), {
           headers: {
             "Content-Type": "image/webp",
-            "Cache-Control": "private, max-age=3600",
+            "Cache-Control": cacheControl,
           },
         })
       }
