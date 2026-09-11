@@ -88,9 +88,12 @@ shape yourself:
     uploaded image at the current quality settings. Useful after importing existing art or
     upgrading the app; your full-resolution originals are never modified.
   - **Orphaned file cleanup** — safely deletes upload files no longer referenced by any card,
-    with a grace period so in-progress uploads are never removed.
+    with a grace period so in-progress uploads are never removed. Collection banner images (and
+    their generated previews/thumbnails) are treated as referenced, so cleanup never removes them.
   - **Full backup** — download every collection and all its files as a single `.zip` (raw data
-    for exact restore, plus a CSV per collection).
+    for exact restore, plus a CSV per collection). The archive is **streamed** to your browser
+    one file at a time, so even a multi-gigabyte library downloads reliably without exhausting
+    server or browser memory.
   - **Restore from backup** — upload a backup `.zip` to bring collections and files back.
     Collections are matched by ID and overwritten; anything not in the backup is left untouched.
 
