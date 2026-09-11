@@ -52,12 +52,13 @@ shape yourself:
   even over a remote tunnel. The optimized image is generated on the server and cached to disk;
   the pristine full-resolution original is always available via the **Download full artwork**
   button beneath the preview.
-- **Seamless image loading.** Derived thumbnails and previews are served with long-lived,
-  revalidating cache headers (with `ETag`/`304` support), so once an image has loaded it appears
-  instantly on repeat views and scroll-backs. Grid cells show a subtle skeleton while loading,
-  fade the image in when ready, and self-heal a stalled request; the large preview paints the
-  cached thumbnail as an instant blurred placeholder instead of an empty box, so brief server
-  latency no longer looks like a missing image.
+- **Seamless image loading.** The authenticated file route validates a cached, signed session
+  cookie instead of a database lookup on every request, so a collection with hundreds of cards
+  no longer serializes its thumbnail loads behind per-request session queries. Derived thumbnails
+  and previews are served with long-lived, revalidating cache headers (with `ETag`/`304` support),
+  so once an image has loaded it appears instantly on repeat views and scroll-backs. Grid cells
+  show a subtle skeleton while loading, fade the image in when ready, and self-heal a stalled
+  request.
 - **Artwork + template pairing.** Each card can carry both its finished artwork and the source
   file used to produce it, keeping design assets attached to the data they belong to.
 

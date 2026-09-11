@@ -57,6 +57,18 @@ export const auth = betterAuth({
     // server action in app/actions/admin.ts, which bypasses this.
     disableSignUp: !isPublicSignupEnabled(),
   },
+  session: {
+    // Cache the session in a short-lived signed cookie so getSession() can
+    // validate it without a database round-trip. This is critical for the
+    // authenticated uploads route: a collection with hundreds of cards fires
+    // that many thumbnail requests, and without this every one of them would
+    // block on a Neon session lookup (the browser only runs ~6 in parallel),
+    // which is what made thumbnails/previews load slowly and intermittently.
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60,
+    },
+  },
   plugins: [nextCookies()],
   ...(process.env.NODE_ENV === "development"
     ? {
