@@ -61,33 +61,38 @@ export async function collectReferencedPaths(): Promise<Set<string>> {
   const rows = await db.select({ data: collectionTable.data }).from(collectionTable)
   const refs = new Set<string>()
 
+  // Mark a `/api/uploads/...` reference (and, for images, its derived
+  // `.thumb.webp`/`.preview.webp` siblings) as live so cleanup never deletes it
+  // and backups always include it.
+  const addRef = (value: unknown, withDerived: boolean) => {
+    if (typeof value !== "string" || !value) return
+    const abs = resolveRef(value, root)
+    if (!abs) return
+    refs.add(abs)
+    if (!withDerived) return
+    const dot = abs.lastIndexOf(".")
+    if (dot > abs.lastIndexOf(path.sep)) {
+      refs.add(abs.slice(0, dot) + THUMBNAIL_SUFFIX)
+      refs.add(abs.slice(0, dot) + PREVIEW_SUFFIX)
+    }
+  }
+
   for (const { data } of rows) {
     if (!isCollection(data)) continue
     const imageCols = new Set(data.columns.filter((c) => c.type === "image").map((c) => c.id))
     const fileCols = new Set(data.columns.filter((c) => c.type === "file").map((c) => c.id))
 
+    // Collection banner: an uploaded image referenced from `data.banner` (not a
+    // column), so it must be tracked explicitly or it looks unreferenced and
+    // gets deleted by orphan cleanup / omitted from backups.
+    addRef(data.banner, true)
+
     for (const row of data.rows) {
-      for (const colId of imageCols) {
-        const value = row.values?.[colId]
-        if (typeof value !== "string" || !value) continue
-        const abs = resolveRef(value, root)
-        if (!abs) continue
-        refs.add(abs)
-        // Derived siblings: `<uuid>.<ext>` -> `<uuid>.thumb.webp` / `.preview.webp`.
-        // Marking them referenced keeps orphan cleanup from deleting the
-        // optimizations of a live image (and includes them in backups).
-        const dot = abs.lastIndexOf(".")
-        if (dot > abs.lastIndexOf(path.sep)) {
-          refs.add(abs.slice(0, dot) + THUMBNAIL_SUFFIX)
-          refs.add(abs.slice(0, dot) + PREVIEW_SUFFIX)
-        }
-      }
-      for (const colId of fileCols) {
-        const value = row.values?.[colId]
-        if (typeof value !== "string" || !value) continue
-        const abs = resolveRef(value, root)
-        if (abs) refs.add(abs)
-      }
+      // Image cells: mark the image and its derived `.thumb`/`.preview` siblings
+      // so live images' optimizations are never treated as orphans.
+      for (const colId of imageCols) addRef(row.values?.[colId], true)
+      // File/template cells: just the file itself (no derived siblings).
+      for (const colId of fileCols) addRef(row.values?.[colId], false)
     }
   }
 
