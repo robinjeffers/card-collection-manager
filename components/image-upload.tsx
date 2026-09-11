@@ -246,19 +246,13 @@ function GridThumb({ src }: { src: string }) {
   const thumb = thumbnailUrl(src)
   const [thumbFailed, setThumbFailed] = useState(false)
   const [loaded, setLoaded] = useState(false)
-  const [attempt, setAttempt] = useState(0)
 
-  const base = thumb && !thumbFailed ? thumb : src
-  const shown = attempt === 0 ? base : `${base}${base.includes("?") ? "&" : "?"}reload=${attempt}`
-
-  useEffect(() => {
-    if (loaded) return
-    const timer = setTimeout(() => {
-      if (attempt < 1) setAttempt((a) => a + 1)
-      else if (thumb && !thumbFailed) setThumbFailed(true)
-    }, 8000)
-    return () => clearTimeout(timer)
-  }, [loaded, attempt, thumb, thumbFailed])
+  // Serve the same stable URL to every load so the browser and the server's
+  // stale-while-revalidate cache can satisfy it — no cache-busting query param,
+  // which would force the server to regenerate and re-read on each retry and
+  // make a busy origin slower. A merely-slow request is left to finish rather
+  // than being cancelled and re-fired.
+  const shown = thumb && !thumbFailed ? thumb : src
 
   return (
     <>
@@ -275,6 +269,7 @@ function GridThumb({ src }: { src: string }) {
         height={72}
         onLoad={() => setLoaded(true)}
         onError={() => {
+          // Only a genuine error falls back from thumbnail to the full image.
           if (thumb && !thumbFailed) {
             setThumbFailed(true)
             setLoaded(false)

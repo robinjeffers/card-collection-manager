@@ -7,16 +7,15 @@ import { tagStyle } from "@/lib/tag-color"
 import { previewUrl, thumbnailUrl } from "@/lib/uploads"
 import type { CardRow, Column } from "@/lib/types"
 
-// Some artwork requests (especially the local uploads route) occasionally stall
-// without ever firing `load` or `error`, leaving a blank preview until the
-// element is remounted. We watchdog each load and retry a fresh request a few
-// times with a cache-busting param before falling back to the next tier.
-const MAX_RETRIES = 2
 // Previews are normally generated eagerly (at upload and via admin "Optimize
-// artwork"), so they exist before the panel asks. This watchdog only matters
-// for the rare lazy build of an older upload; give sharp ample room so we don't
-// prematurely give up and drop to the tiny grid thumbnail.
-const STALL_TIMEOUT_MS = 9000
+// artwork"), so they usually exist before the panel asks. When one isn't ready
+// this instant the serve route builds it on demand, which can take a moment on
+// a busy origin. We watchdog that wait, but on a stall we drop to the next
+// (already-cached) tier using the SAME url rather than re-firing a cache-busting
+// request — replaying with `?reload=` only forces the server to regenerate and
+// re-read, making a congested origin slower. A slow-but-live request is left to
+// finish on its own.
+const STALL_TIMEOUT_MS = 12000
 
 // The panel is a lightweight visual reference, so we only ever *display* a
 // small image: the optimized preview WebP first, then the grid thumbnail. The
@@ -50,49 +49,37 @@ export function ImagePreview({ row, columns }: ImagePreviewProps) {
   if (src) tiers.push({ tier: "full", url: src })
 
   const [tierIndex, setTierIndex] = useState(0)
-  const [attempt, setAttempt] = useState(0)
   const [status, setStatus] = useState<"loading" | "loaded" | "error">(src ? "loading" : "loaded")
 
   // Reset the load lifecycle whenever the selected artwork changes.
   useEffect(() => {
     setTierIndex(0)
-    setAttempt(0)
     setStatus(src ? "loading" : "loaded")
   }, [src])
 
-  // Advance to the next (larger) display tier. The serve route generates the
-  // optimized preview on demand, so a failing preview tier just means it isn't
-  // ready this instant; the retry/fallback below covers it.
-  const advanceTier = () => {
-    setTierIndex((i) => i + 1)
-    setAttempt(0)
-    setStatus("loading")
-  }
-
+  // On failure (or a stall), fall through to the next already-cached display
+  // tier — preview -> thumbnail -> full — reusing each tier's stable URL so the
+  // browser cache can satisfy it. Only when every tier is exhausted do we show
+  // the error state.
   const handleFailure = () => {
-    if (attempt < MAX_RETRIES) {
-      setAttempt((a) => a + 1)
+    if (tierIndex < tiers.length - 1) {
+      setTierIndex((i) => i + 1)
       setStatus("loading")
-    } else if (tierIndex < tiers.length - 1) {
-      advanceTier()
     } else {
       setStatus("error")
     }
   }
 
-  // Watchdog: if a load neither completes nor errors, treat it as a failure.
+  // Watchdog: if a load neither completes nor errors, drop to the next tier.
   useEffect(() => {
     if (status !== "loading" || !src) return
     const timer = setTimeout(handleFailure, STALL_TIMEOUT_MS)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, tierIndex, attempt, src])
+  }, [status, tierIndex, src])
 
   const current = tiers[tierIndex]
-  const base = current?.url ?? ""
-  // Retries use a cache-busting param so the browser issues a genuinely new
-  // request rather than replaying the stalled one.
-  const displaySrc = attempt === 0 ? base : `${base}${base.includes("?") ? "&" : "?"}reload=${attempt}`
+  const displaySrc = current?.url ?? ""
 
   // Filename for the "Download full artwork" action, derived from the card name.
   const ext = (src.split("?")[0].split(".").pop() || "png").toLowerCase()
