@@ -231,7 +231,7 @@ export function CollectionManager({
             </Button>
           ) : null}
           </div>
-          <div className="ml-1 flex items-center gap-2 border-l border-border pl-3">
+          <div className="ml-1 hidden items-center gap-2 border-l border-border pl-3 lg:flex">
             <span className="hidden text-sm text-muted-foreground sm:inline">{userName}</span>
             <Button
               variant="ghost"
