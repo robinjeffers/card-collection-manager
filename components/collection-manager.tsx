@@ -195,6 +195,9 @@ export function CollectionManager({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Import / editing tools are desktop-only — mobile is a trimmed,
+              search-first view for quickly looking up cards. */}
+          <div className="hidden items-center gap-2 lg:flex">
           <Button variant="outline" onClick={() => setColumnDialog(true)}>
             <Columns3 />
             Add Column
@@ -227,6 +230,7 @@ export function CollectionManager({
               Admin
             </Button>
           ) : null}
+          </div>
           <div className="ml-1 flex items-center gap-2 border-l border-border pl-3">
             <span className="hidden text-sm text-muted-foreground sm:inline">{userName}</span>
             <Button
@@ -245,7 +249,60 @@ export function CollectionManager({
         </div>
       </header>
 
-      <div className="grid flex-1 gap-6 lg:grid-cols-[1fr_440px]">
+      {/* Mobile: trimmed, search-first view. No grid or import tools — type a
+          name and press Enter (or tap a match) to preview a card. Tag info
+          shows underneath via the shared ImagePreview. */}
+      <div className="flex flex-1 flex-col gap-4 lg:hidden">
+        <div className="relative">
+          <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) {
+                e.preventDefault()
+                if (filteredRows[0]) setSelectedId(filteredRows[0].id)
+              }
+            }}
+            placeholder="Search cards by name…"
+            className={cn(fieldClass, "pl-9")}
+            inputMode="search"
+            enterKeyHint="search"
+          />
+        </div>
+        {search.trim() && filteredRows.length > 0 ? (
+          <ul className="flex flex-col overflow-hidden rounded-xl border border-border">
+            {filteredRows.slice(0, 50).map((row) => {
+              const rowName = String(row.values.name ?? "") || "Untitled card"
+              const active = row.id === selectedId
+              return (
+                <li key={row.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(row.id)}
+                    className={cn(
+                      "flex w-full items-center border-b border-border px-3 py-2.5 text-left text-sm transition-colors last:border-0",
+                      active
+                        ? "bg-primary/10 font-medium text-foreground"
+                        : "text-muted-foreground hover:bg-muted/50",
+                    )}
+                  >
+                    {rowName}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        ) : search.trim() ? (
+          <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
+            No cards match your search.
+          </p>
+        ) : null}
+        <ImagePreview row={selectedRow} columns={collection.columns} />
+      </div>
+
+      {/* Desktop: full editable grid + sticky preview, unchanged. */}
+      <div className="hidden flex-1 gap-6 lg:grid lg:grid-cols-[1fr_440px]">
         <div className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-col gap-3">
             <div className="relative">
