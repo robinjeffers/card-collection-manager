@@ -31,11 +31,21 @@ interface ImagePreviewProps {
 export function ImagePreview({ row, columns }: ImagePreviewProps) {
   const artworkCol = columns.find((c) => c.isArtwork)
   const nameCol = columns.find((c) => c.id === "name")
-  const tagCol = columns.find((c) => c.type === "tag")
+  const tagCols = columns.filter((c) => c.type === "tag")
 
   const src = artworkCol && row ? String(row.values[artworkCol.id] ?? "") : ""
   const name = nameCol && row ? String(row.values[nameCol.id] ?? "") : ""
-  const tags = tagCol && row && Array.isArray(row.values[tagCol.id]) ? (row.values[tagCol.id] as string[]) : []
+
+  // Flatten tags across every tag column so the preview reflects all of a
+  // card's tags (e.g. both "Deck" and "Magic"), each styled with its own
+  // column's option colors. Keys are namespaced by column to stay unique when
+  // the same tag value appears in more than one column.
+  const tags = row
+    ? tagCols.flatMap((col) => {
+        const values = Array.isArray(row.values[col.id]) ? (row.values[col.id] as string[]) : []
+        return values.map((tag) => ({ key: `${col.id}:${tag}`, tag, options: col.options }))
+      })
+    : []
 
   // Derived small-image URLs for our own uploads (null for external images).
   const preview = previewUrl(src)
@@ -135,10 +145,10 @@ export function ImagePreview({ row, columns }: ImagePreviewProps) {
         <h2 className="text-lg font-semibold text-balance">{name || "Untitled card"}</h2>
         {tags.length > 0 ? (
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {tags.map((tag) => (
+            {tags.map(({ key, tag, options }) => (
               <span
-                key={tag}
-                style={tagStyle(tag, tagCol?.options)}
+                key={key}
+                style={tagStyle(tag, options)}
                 className="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium"
               >
                 {tag}
