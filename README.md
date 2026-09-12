@@ -49,7 +49,9 @@ shape yourself:
   - **File** — an arbitrary attachment such as a print-ready template (`.afdesign`, `.psd`,
     `.pdf`, etc.), downloadable straight from the card.
 - **Inline editing.** Edit any cell directly in the grid, or open a card in a focused form
-  dialog. A large preview panel shows the selected card's artwork at a comfortable size.
+  dialog. A large preview panel shows the selected card's artwork at a comfortable size, with the
+  card's tags from every tag column (e.g. both `Deck` and `Magic`) shown beneath it, each colored
+  to match its source column.
 - **Fast, web-optimized artwork.** The preview panel displays a compressed, right-sized version
   of each image (typically a small fraction of the original's file size), so browsing stays fast
   even over a remote tunnel. The optimized image is generated on the server and cached to disk;
