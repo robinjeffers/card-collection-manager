@@ -78,6 +78,13 @@ shape yourself:
   view. The overscan is kept intentionally small so that on a remote connection the browser
   doesn't fire a wide burst of thumbnail requests all at once.
 
+- **Mobile is a trimmed, search-first view.** On phone-sized screens the editing surface (the
+  data grid, tag-filter chips, bulk actions, import/column tools, and the sign-out control) is
+  hidden. Instead you get a single search box: type a card name, tap a result (or press Enter to
+  pick the top match) to see its artwork preview with the same tag information shown underneath.
+  Editing and importing remain desktop-only — mobile is optimized purely for quickly looking up
+  a card. The desktop experience is unchanged.
+
   > **Serving remotely — avoid Cloudflare Tunnel for image-heavy use.** Thumbnails may load
   > slowly or intermittently appear blank when the app is accessed through a **Cloudflare
   > Tunnel**, because the tunnel proxies each of the many per-card image requests individually
