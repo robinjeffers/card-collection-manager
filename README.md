@@ -72,6 +72,15 @@ shape yourself:
   `docker compose logs -f app` — so the source of a stall can be pinpointed rather than guessed.
 - **Artwork + template pairing.** Each card can carry both its finished artwork and the source
   file used to produce it, keeping design assets attached to the data they belong to.
+- **Artwork w/ Bleed.** Every collection has a locked **Artwork w/ Bleed** image column (added
+  automatically, right after Artwork) for the print-ready, full-bleed version of each card. The
+  preview panel always uses the regular **Artwork** column.
+- **Bulk pair imports.** Two desktop import options create one card per matching file name:
+  - **Import Artwork + Templates** — pairs `Acid Surge.png` with `Acid Surge.afdesign`.
+  - **Import Artwork + Bleed + Templates** — also picks up bleed artwork named with a `_Bleed`
+    suffix, so `Acid Surge.png`, `Acid Surge_Bleed.png`, and `Acid Surge.afdesign` become a
+    single **Acid Surge** card with all three slots filled. Cards missing any file are flagged as
+    unmatched but still imported.
 
 ### Working with large collections
 
@@ -105,7 +114,8 @@ shape yourself:
 - **Bulk field import** to populate column values across many cards at once.
 - **Per-collection export** — download a single collection as a `.zip` from its card on the home
   screen. Card data is always included as `collection.json` and `collection.csv`; a confirmation
-  dialog lets you choose whether to also bundle artwork (`images/`) and template files
+  dialog lets you choose whether to also bundle artwork (`images/`), bleed artwork (`bleed/`,
+  named `Card Name_Bleed.<ext>` to match the import convention), and template files
   (`templates/`).
 
 ### Safety nets

@@ -10,7 +10,8 @@ import { ImagePreview } from "@/components/image-preview"
 import { AddColumnDialog } from "@/components/add-column-dialog"
 import { CardFormDialog } from "@/components/card-form-dialog"
 import { ImportImagesDialog } from "@/components/import-images-dialog"
-import { ImportPairsDialog } from "@/components/import-pairs-dialog"
+import { ImportPairsDialog, type ImportedPair } from "@/components/import-pairs-dialog"
+import { BLEED_COLUMN_ID } from "@/lib/default-data"
 import { ImportFieldsDialog } from "@/components/import-fields-dialog"
 import { BulkEditDialog } from "@/components/bulk-edit-dialog"
 import { Button } from "@/components/ui/button"
@@ -65,6 +66,7 @@ export function CollectionManager({
   const [cardDialog, setCardDialog] = useState(false)
   const [importDialog, setImportDialog] = useState(false)
   const [pairsDialog, setPairsDialog] = useState(false)
+  const [bleedPairsDialog, setBleedPairsDialog] = useState(false)
   const [fieldsDialog, setFieldsDialog] = useState(false)
   const [editingRow, setEditingRow] = useState<CardRow | null>(null)
 
@@ -94,6 +96,21 @@ export function CollectionManager({
   }, [tagCols])
   const artworkCol = collection.columns.find((c) => c.isArtwork) ?? collection.columns.find((c) => c.type === "image")
   const templateCol = collection.columns.find((c) => c.type === "file")
+  const bleedCol = collection.columns.find((c) => c.id === BLEED_COLUMN_ID)
+
+  const handlePairsImport = (imported: ImportedPair[]) => {
+    if (!artworkCol || !templateCol) return
+    const ids = addRows(
+      imported.map((item) => {
+        const values: Record<string, string> = { name: item.name }
+        if (item.artworkUrl) values[artworkCol.id] = item.artworkUrl
+        if (item.bleedUrl && bleedCol) values[bleedCol.id] = item.bleedUrl
+        if (item.templateUrl) values[templateCol.id] = item.templateUrl
+        return values
+      }),
+    )
+    if (ids[0]) setSelectedId(ids[0])
+  }
 
   const filteredRows = useMemo(() => {
     return collection.rows
@@ -212,6 +229,12 @@ export function CollectionManager({
             <Button variant="outline" onClick={() => setPairsDialog(true)}>
               <Layers />
               Import Artwork + Templates
+            </Button>
+          ) : null}
+          {artworkCol && templateCol && bleedCol ? (
+            <Button variant="outline" onClick={() => setBleedPairsDialog(true)}>
+              <Layers />
+              Import Artwork + Bleed + Templates
             </Button>
           ) : null}
           {hasFieldColumns ? (
@@ -426,17 +449,15 @@ export function CollectionManager({
         <ImportPairsDialog
           open={pairsDialog}
           onClose={() => setPairsDialog(false)}
-          onImport={(imported) => {
-            const ids = addRows(
-              imported.map((item) => {
-                const values: Record<string, string> = { name: item.name }
-                if (item.artworkUrl) values[artworkCol.id] = item.artworkUrl
-                if (item.templateUrl) values[templateCol.id] = item.templateUrl
-                return values
-              }),
-            )
-            if (ids[0]) setSelectedId(ids[0])
-          }}
+          onImport={handlePairsImport}
+        />
+      ) : null}
+      {artworkCol && templateCol && bleedCol ? (
+        <ImportPairsDialog
+          open={bleedPairsDialog}
+          onClose={() => setBleedPairsDialog(false)}
+          onImport={handlePairsImport}
+          withBleed
         />
       ) : null}
       <ImportFieldsDialog

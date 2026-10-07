@@ -41,6 +41,7 @@ export function CollectionsHome({
   const [exporting, setExporting] = useState<CollectionSummary | null>(null)
   const [exportArtwork, setExportArtwork] = useState(true)
   const [exportTemplates, setExportTemplates] = useState(true)
+  const [exportBleed, setExportBleed] = useState(true)
 
   const submitCreate = () => {
     startTransition(async () => {
@@ -74,6 +75,7 @@ export function CollectionsHome({
   const openExport = (c: CollectionSummary) => {
     setExportArtwork(true)
     setExportTemplates(true)
+    setExportBleed(true)
     setExporting(c)
   }
 
@@ -82,6 +84,7 @@ export function CollectionsHome({
     const params = new URLSearchParams()
     if (!exportArtwork) params.set("artwork", "0")
     if (!exportTemplates) params.set("templates", "0")
+    if (!exportBleed) params.set("bleed", "0")
     const query = params.toString()
     window.location.href = `/api/collections/${exporting.id}/export${query ? `?${query}` : ""}`
     setExporting(null)
@@ -269,6 +272,20 @@ export function CollectionsHome({
             <span className="flex flex-col">
               <span className="text-sm font-medium">Include artwork</span>
               <span className="text-xs text-muted-foreground">Card images bundled in an images/ folder.</span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:border-primary/60">
+            <input
+              type="checkbox"
+              checked={exportBleed}
+              onChange={(e) => setExportBleed(e.target.checked)}
+              className="size-4 shrink-0 accent-primary"
+            />
+            <span className="flex flex-col">
+              <span className="text-sm font-medium">Include artwork w/ bleed</span>
+              <span className="text-xs text-muted-foreground">
+                Bleed artwork bundled in a bleed/ folder as Card Name_Bleed.
+              </span>
             </span>
           </label>
           <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:border-primary/60">
