@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useRef, useState, type ChangeEvent } from "react"
-import { AlertTriangle, Check, FileText, ImageIcon, Layers, Loader2, X } from "lucide-react"
+import { AlertTriangle, Check, FileText, Frame, ImageIcon, Layers, Loader2, X } from "lucide-react"
 import { Modal } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/field"
@@ -14,29 +14,40 @@ import {
 } from "@/lib/uploads"
 import { createThumbnailBlob } from "@/lib/image-thumbnail"
 
+export interface ImportedPair {
+  name: string
+  artworkUrl?: string
+  bleedUrl?: string
+  templateUrl?: string
+}
+
 interface ImportPairsDialogProps {
   open: boolean
   onClose: () => void
-  onImport: (items: { name: string; artworkUrl?: string; templateUrl?: string }[]) => void
+  onImport: (items: ImportedPair[]) => void
+  /** Also accept `<name>_Bleed.<ext>` images as a third, bleed-artwork slot. */
+  withBleed?: boolean
 }
 
+type SlotKey = "image" | "bleed" | "template"
 type SlotStatus = "none" | "pending" | "uploading" | "done" | "error"
+
+interface Slot {
+  file?: File
+  status: SlotStatus
+  url?: string
+  error?: string
+}
 
 interface Pair {
   id: string
   name: string
-  imageFile?: File
-  templateFile?: File
-  imageStatus: SlotStatus
-  templateStatus: SlotStatus
-  imageUrl?: string
-  templateUrl?: string
-  imageError?: string
-  templateError?: string
+  slots: Record<SlotKey, Slot>
 }
 
 const IMAGE_EXTS = new Set(Object.keys(EXTENSION_MIME))
 const TEMPLATE_EXTS = new Set(Object.keys(TEMPLATE_EXTENSION_MIME))
+const BLEED_SUFFIX = /_bleed$/i
 
 /** Strip the extension to use as the pairing key / default card name. */
 function baseName(filename: string) {
@@ -44,13 +55,17 @@ function baseName(filename: string) {
   return (dot > 0 ? filename.slice(0, dot) : filename).trim()
 }
 
+const emptySlot = (): Slot => ({ status: "none" })
+
 let counter = 0
 
-export function ImportPairsDialog({ open, onClose, onImport }: ImportPairsDialogProps) {
+export function ImportPairsDialog({ open, onClose, onImport, withBleed = false }: ImportPairsDialogProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [pairs, setPairs] = useState<Pair[]>([])
   const [dragActive, setDragActive] = useState(false)
   const [importing, setImporting] = useState(false)
+
+  const activeSlots: SlotKey[] = withBleed ? ["image", "bleed", "template"] : ["image", "template"]
 
   const addFiles = (files: FileList | File[]) => {
     const incoming = Array.from(files)
@@ -71,28 +86,26 @@ export function ImportPairsDialog({ open, onClose, onImport }: ImportPairsDialog
         const isTemplate = TEMPLATE_EXTS.has(ext)
         if (!isImage && !isTemplate) continue
 
-        const base = baseName(file.name)
+        let base = baseName(file.name)
+        let slotKey: SlotKey = isImage ? "image" : "template"
+        if (isImage && withBleed && BLEED_SUFFIX.test(base)) {
+          base = base.replace(BLEED_SUFFIX, "").trim()
+          slotKey = "bleed"
+        }
+        if (!base) continue
+
         const key = base.toLowerCase()
         let pair = byName.get(key)
         if (!pair) {
           pair = {
             id: `pair-${counter++}`,
             name: base,
-            imageStatus: "none",
-            templateStatus: "none",
+            slots: { image: emptySlot(), bleed: emptySlot(), template: emptySlot() },
           }
           byName.set(key, pair)
           order.push(key)
         }
-        if (isImage) {
-          pair.imageFile = file
-          pair.imageStatus = "pending"
-          pair.imageError = undefined
-        } else {
-          pair.templateFile = file
-          pair.templateStatus = "pending"
-          pair.templateError = undefined
-        }
+        pair.slots = { ...pair.slots, [slotKey]: { file, status: "pending" } }
       }
 
       return order.map((k) => byName.get(k)!)
@@ -117,21 +130,19 @@ export function ImportPairsDialog({ open, onClose, onImport }: ImportPairsDialog
   const renamePair = (id: string, name: string) =>
     setPairs((prev) => prev.map((p) => (p.id === id ? { ...p, name } : p)))
 
-  const reset = () => {
-    setPairs([])
-    setImporting(false)
-  }
-
   const close = () => {
     if (importing) return
-    reset()
+    setPairs([])
     onClose()
   }
 
-  const pendingCount = useMemo(() => pairs.filter((p) => p.imageStatus !== "done" || p.templateStatus !== "done").length, [pairs])
+  const isPairDone = (p: Pair) => activeSlots.every((k) => !p.slots[k].file || p.slots[k].status === "done")
+  const hasPending = (p: Pair) => activeSlots.some((k) => p.slots[k].file && p.slots[k].status !== "done")
+
+  const pendingCount = useMemo(() => pairs.filter(hasPending).length, [pairs]) // eslint-disable-line react-hooks/exhaustive-deps
   const unmatchedCount = useMemo(
-    () => pairs.filter((p) => !p.imageFile || !p.templateFile).length,
-    [pairs],
+    () => pairs.filter((p) => activeSlots.some((k) => !p.slots[k].file)).length,
+    [pairs], // eslint-disable-line react-hooks/exhaustive-deps
   )
 
   async function uploadFile(file: File, kind: "image" | "file"): Promise<string> {
@@ -152,58 +163,49 @@ export function ImportPairsDialog({ open, onClose, onImport }: ImportPairsDialog
     return url
   }
 
+  const setSlot = (pairId: string, key: SlotKey, patch: Partial<Slot>) =>
+    setPairs((prev) =>
+      prev.map((p) => (p.id === pairId ? { ...p, slots: { ...p.slots, [key]: { ...p.slots[key], ...patch } } } : p)),
+    )
+
   const runImport = async () => {
     setImporting(true)
-    const succeeded: { name: string; artworkUrl?: string; templateUrl?: string }[] = []
+    const succeeded: ImportedPair[] = []
     let failures = 0
 
     for (const pair of pairs) {
-      const needsImage = pair.imageFile && pair.imageStatus !== "done"
-      const needsTemplate = pair.templateFile && pair.templateStatus !== "done"
-      if (!needsImage && !needsTemplate && pair.imageStatus !== "done" && pair.templateStatus !== "done") {
-        continue
-      }
+      if (!hasPending(pair)) continue
 
-      let imageUrl = pair.imageUrl
-      let templateUrl = pair.templateUrl
+      const urls: Partial<Record<SlotKey, string>> = {}
       let pairFailed = false
 
-      if (needsImage) {
-        setPairs((prev) => prev.map((p) => (p.id === pair.id ? { ...p, imageStatus: "uploading", imageError: undefined } : p)))
-        try {
-          imageUrl = await uploadFile(pair.imageFile!, "image")
-          setPairs((prev) => prev.map((p) => (p.id === pair.id ? { ...p, imageStatus: "done", imageUrl } : p)))
-        } catch (e) {
-          pairFailed = true
-          setPairs((prev) =>
-            prev.map((p) =>
-              p.id === pair.id ? { ...p, imageStatus: "error", imageError: e instanceof Error ? e.message : "Failed" } : p,
-            ),
-          )
+      for (const key of activeSlots) {
+        const slot = pair.slots[key]
+        if (!slot.file) continue
+        if (slot.status === "done") {
+          urls[key] = slot.url
+          continue
         }
-      }
-
-      if (needsTemplate) {
-        setPairs((prev) => prev.map((p) => (p.id === pair.id ? { ...p, templateStatus: "uploading", templateError: undefined } : p)))
+        setSlot(pair.id, key, { status: "uploading", error: undefined })
         try {
-          templateUrl = await uploadFile(pair.templateFile!, "file")
-          setPairs((prev) => prev.map((p) => (p.id === pair.id ? { ...p, templateStatus: "done", templateUrl } : p)))
+          const url = await uploadFile(slot.file, key === "template" ? "file" : "image")
+          urls[key] = url
+          setSlot(pair.id, key, { status: "done", url })
         } catch (e) {
           pairFailed = true
-          setPairs((prev) =>
-            prev.map((p) =>
-              p.id === pair.id
-                ? { ...p, templateStatus: "error", templateError: e instanceof Error ? e.message : "Failed" }
-                : p,
-            ),
-          )
+          setSlot(pair.id, key, { status: "error", error: e instanceof Error ? e.message : "Failed" })
         }
       }
 
       if (pairFailed) {
         failures += 1
       } else {
-        succeeded.push({ name: pair.name.trim() || "Untitled", artworkUrl: imageUrl, templateUrl })
+        succeeded.push({
+          name: pair.name.trim() || "Untitled",
+          artworkUrl: urls.image,
+          bleedUrl: urls.bleed,
+          templateUrl: urls.template,
+        })
       }
     }
 
@@ -216,7 +218,7 @@ export function ImportPairsDialog({ open, onClose, onImport }: ImportPairsDialog
       setPairs([])
       onClose()
     } else {
-      setPairs((prev) => prev.filter((p) => p.imageStatus === "error" || p.templateStatus === "error"))
+      setPairs((prev) => prev.filter((p) => activeSlots.some((k) => p.slots[k].status === "error")))
     }
   }
 
@@ -232,12 +234,22 @@ export function ImportPairsDialog({ open, onClose, onImport }: ImportPairsDialog
     onDrop,
   }
 
+  const slotMeta: Record<SlotKey, { label: string; icon: React.ReactNode }> = {
+    image: { label: "Artwork", icon: <ImageIcon className="size-3.5" /> },
+    bleed: { label: "Bleed", icon: <Frame className="size-3.5" /> },
+    template: { label: "Template", icon: <FileText className="size-3.5" /> },
+  }
+
   return (
     <Modal
       open={open}
       onClose={close}
-      title="Import artwork + templates"
-      description="Drop artwork and template files together. Files that share a name (without extension) are paired into one card."
+      title={withBleed ? "Import artwork + bleed + templates" : "Import artwork + templates"}
+      description={
+        withBleed
+          ? "Drop artwork, bleed artwork, and template files together. Files that share a name are paired into one card — bleed artwork is matched by a _Bleed suffix (e.g. Acid Surge_Bleed.png)."
+          : "Drop artwork and template files together. Files that share a name (without extension) are paired into one card."
+      }
     >
       <input
         ref={inputRef}
@@ -260,47 +272,48 @@ export function ImportPairsDialog({ open, onClose, onImport }: ImportPairsDialog
       >
         <Layers className="size-6" />
         <span className="text-sm">
-          {dragActive ? "Drop files to add" : "Click or drag artwork and template files here"}
+          {dragActive
+            ? "Drop files to add"
+            : withBleed
+              ? "Click or drag artwork, bleed, and template files here"
+              : "Click or drag artwork and template files here"}
         </span>
       </button>
 
       {unmatchedCount > 0 ? (
         <p className="mt-3 flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
           <AlertTriangle className="size-3.5 shrink-0" />
-          {unmatchedCount} card{unmatchedCount === 1 ? " is" : "s are"} missing artwork or a template. They&apos;ll still
-          be imported.
+          {unmatchedCount} card{unmatchedCount === 1 ? " is" : "s are"} missing{" "}
+          {withBleed ? "artwork, bleed, or a template" : "artwork or a template"}. They&apos;ll still be imported.
         </p>
       ) : null}
 
       {pairs.length > 0 ? (
         <ul className="mt-4 flex max-h-80 flex-col gap-2 overflow-y-auto pr-1">
           {pairs.map((pair) => {
-            const unmatched = !pair.imageFile || !pair.templateFile
+            const unmatched = activeSlots.some((k) => !pair.slots[k].file)
+            const done = isPairDone(pair)
             return (
               <li key={pair.id} className="flex items-center gap-2 rounded-md border border-border p-2">
                 <div className="min-w-0 flex-1">
                   <Input
                     value={pair.name}
                     onChange={(e) => renamePair(pair.id, e.target.value)}
-                    disabled={importing || (pair.imageStatus === "done" && pair.templateStatus === "done")}
-                    aria-label={`Card name`}
+                    disabled={importing || done}
+                    aria-label="Card name"
                     className="h-8"
                   />
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                    <SlotBadge
-                      icon={<ImageIcon className="size-3.5" />}
-                      label="Artwork"
-                      present={!!pair.imageFile}
-                      status={pair.imageStatus}
-                      error={pair.imageError}
-                    />
-                    <SlotBadge
-                      icon={<FileText className="size-3.5" />}
-                      label="Template"
-                      present={!!pair.templateFile}
-                      status={pair.templateStatus}
-                      error={pair.templateError}
-                    />
+                    {activeSlots.map((key) => (
+                      <SlotBadge
+                        key={key}
+                        icon={slotMeta[key].icon}
+                        label={slotMeta[key].label}
+                        present={!!pair.slots[key].file}
+                        status={pair.slots[key].status}
+                        error={pair.slots[key].error}
+                      />
+                    ))}
                     {unmatched ? (
                       <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
                         <AlertTriangle className="size-3" />
@@ -309,7 +322,7 @@ export function ImportPairsDialog({ open, onClose, onImport }: ImportPairsDialog
                     ) : null}
                   </div>
                 </div>
-                {!importing && !(pair.imageStatus === "done" && pair.templateStatus === "done") ? (
+                {!importing && !done ? (
                   <Button type="button" variant="ghost" size="icon-sm" aria-label="Remove card" onClick={() => removePair(pair.id)}>
                     <X />
                   </Button>

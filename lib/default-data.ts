@@ -2,6 +2,10 @@ import type { Collection } from "./types"
 
 export const DECK_TAGS = ["Consumable", "Tier 1", "Tier 2", "Tier 3", "Spells", "Unique"]
 
+/** Locked image column holding each card's full-bleed artwork (not used for the preview). */
+export const BLEED_COLUMN_ID = "artwork_bleed"
+export const BLEED_COLUMN_NAME = "Artwork w/ Bleed"
+
 /**
  * A brand-new collection starts empty: just the two locked columns every
  * collection needs (the card name and the artwork that drives the preview).
@@ -12,6 +16,7 @@ export function emptyCollection(): Collection {
     columns: [
       { id: "name", name: "Card Name", type: "text", locked: true },
       { id: "artwork", name: "Artwork", type: "image", locked: true, isArtwork: true },
+      { id: BLEED_COLUMN_ID, name: BLEED_COLUMN_NAME, type: "image", locked: true },
       { id: "template", name: "Template", type: "file", locked: true },
     ],
     rows: [],
@@ -22,6 +27,7 @@ export const defaultCollection: Collection = {
   columns: [
     { id: "name", name: "Card Name", type: "text", locked: true },
     { id: "artwork", name: "Artwork", type: "image", locked: true, isArtwork: true },
+    { id: BLEED_COLUMN_ID, name: BLEED_COLUMN_NAME, type: "image", locked: true },
     { id: "template", name: "Template", type: "file", locked: true },
     { id: "tags", name: "Deck Tags", type: "tag", options: [...DECK_TAGS], locked: true },
     { id: "strength", name: "Strength", type: "number", locked: true },

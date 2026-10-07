@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { collection as collectionTable } from "@/lib/db/schema"
-import { emptyCollection } from "@/lib/default-data"
+import { BLEED_COLUMN_ID, BLEED_COLUMN_NAME, emptyCollection } from "@/lib/default-data"
 import type { Collection, CollectionSummary } from "@/lib/types"
 
 // Collections are shared: any signed-in user may view and edit every
@@ -67,6 +67,20 @@ function normalizeCollection(data: Collection): { data: Collection; changed: boo
     }
     const artIdx = columns.findIndex((c) => c.isArtwork || c.id === "artwork")
     columns = artIdx >= 0 ? [...columns.slice(0, artIdx + 1), templateCol, ...columns.slice(artIdx + 1)] : [...columns, templateCol]
+    changed = true
+  }
+
+  // Every collection also gets the locked "Artwork w/ Bleed" image column,
+  // placed right after Artwork. It never drives the preview (no isArtwork).
+  if (!columns.some((c) => c.id === BLEED_COLUMN_ID)) {
+    const bleedCol: Collection["columns"][number] = {
+      id: BLEED_COLUMN_ID,
+      name: BLEED_COLUMN_NAME,
+      type: "image",
+      locked: true,
+    }
+    const artIdx = columns.findIndex((c) => c.isArtwork || c.id === "artwork")
+    columns = artIdx >= 0 ? [...columns.slice(0, artIdx + 1), bleedCol, ...columns.slice(artIdx + 1)] : [...columns, bleedCol]
     changed = true
   }
 

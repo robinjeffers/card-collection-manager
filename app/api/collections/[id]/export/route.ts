@@ -8,6 +8,7 @@ import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { collection as collectionTable } from "@/lib/db/schema"
 import { UPLOAD_DIR } from "@/lib/uploads"
+import { BLEED_COLUMN_ID } from "@/lib/default-data"
 import type { CardRow, CellValue, Collection } from "@/lib/types"
 
 const UPLOAD_PREFIX = "/api/uploads/"
@@ -84,6 +85,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const isFalsey = (v: string | null) => v === "0" || v === "false"
   const includeArtwork = !isFalsey(searchParams.get("artwork"))
   const includeTemplates = !isFalsey(searchParams.get("templates"))
+  const includeBleed = !isFalsey(searchParams.get("bleed"))
 
   const [row] = await db
     .select()
@@ -132,6 +134,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   // folder each media column maps to inside the archive, or null if excluded.
   const folderFor = (colId: string): string | null => {
+    if (colId === BLEED_COLUMN_ID) return includeBleed ? "bleed" : null
     if (imageColumnIds.has(colId)) return includeArtwork ? "images" : null
     if (fileColumnIds.has(colId)) return includeTemplates ? "templates" : null
     return null
@@ -147,7 +150,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       if (typeof ref !== "string" || !ref) continue
       const resolved = resolveUpload(ref)
       if (!resolved) continue // external URL or invalid — leave untouched
-      const filename = uniqueName(folder, cardName, path.extname(resolved.base))
+      // Bleed files mirror the import convention: "<Card Name>_Bleed.<ext>".
+      const exportName = colId === BLEED_COLUMN_ID ? `${cardName.trim() || "card"}_Bleed` : cardName
+      const filename = uniqueName(folder, exportName, path.extname(resolved.base))
       values[colId] = `${folder}/${filename}`
       toRead.push({ folder, filename, abs: resolved.abs })
     }
@@ -170,7 +175,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     version: 1,
     exportedAt: new Date().toISOString(),
     name: row.name,
-    includes: { artwork: includeArtwork, templates: includeTemplates },
+    includes: { artwork: includeArtwork, bleed: includeBleed, templates: includeTemplates },
     collection: { columns: source.columns, rows } satisfies Collection,
   }
 
