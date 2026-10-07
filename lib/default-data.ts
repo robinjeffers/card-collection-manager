@@ -4,7 +4,8 @@ export const DECK_TAGS = ["Consumable", "Tier 1", "Tier 2", "Tier 3", "Spells", 
 
 /** Locked image column holding each card's full-bleed artwork (not used for the preview). */
 export const BLEED_COLUMN_ID = "artwork_bleed"
-export const BLEED_COLUMN_NAME = "Artwork w/ Bleed"
+export const BLEED_COLUMN_NAME = "Art w/ Bleed"
+export const LEGACY_BLEED_COLUMN_NAME = "Artwork w/ Bleed"
 
 /**
  * A brand-new collection starts empty: just the two locked columns every

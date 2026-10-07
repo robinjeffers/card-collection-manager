@@ -72,7 +72,7 @@ shape yourself:
   `docker compose logs -f app` — so the source of a stall can be pinpointed rather than guessed.
 - **Artwork + template pairing.** Each card can carry both its finished artwork and the source
   file used to produce it, keeping design assets attached to the data they belong to.
-- **Artwork w/ Bleed.** Every collection has a locked **Artwork w/ Bleed** image column (added
+- **Art w/ Bleed.** Every collection has a locked **Art w/ Bleed** image column (added
   automatically, right after Artwork) for the print-ready, full-bleed version of each card. The
   preview panel always uses the regular **Artwork** column.
 - **Bulk pair imports.** Two desktop import options create one card per matching file name:
