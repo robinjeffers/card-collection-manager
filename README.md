@@ -118,7 +118,9 @@ shape yourself:
   screen. Card data is always included as `collection.json` and `collection.csv`; a confirmation
   dialog lets you choose whether to also bundle artwork (`images/`), bleed artwork (`bleed/`,
   named `Card Name_Bleed.<ext>` to match the import convention), and template files
-  (`templates/`).
+  (`templates/`). The zip is **streamed** to your browser as it's built, so large collections with
+  lots of artwork download reliably without holding the whole archive in memory. The CSV can be fed
+  straight back into **Import Fields** (image columns in it are ignored).
 
 ### Read-only share links
 
