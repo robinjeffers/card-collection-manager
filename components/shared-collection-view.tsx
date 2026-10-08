@@ -80,6 +80,9 @@ export function SharedCollectionView({ name, collection }: { name: string; colle
           Shared collection · read only
         </p>
         <h1 className="text-2xl font-semibold tracking-tight text-balance">{name}</h1>
+        {collection.cardGame ? (
+          <p className="text-sm font-medium text-primary">{collection.cardGame}</p>
+        ) : null}
         <p className="text-sm text-muted-foreground">
           {collection.rows.length} card{collection.rows.length === 1 ? "" : "s"}
         </p>

@@ -24,6 +24,8 @@ export interface Collection {
   rows: CardRow[]
   /** Optional banner image URL shown on the collection's home card. */
   banner?: string
+  /** Optional game this collection belongs to, shown under its name. */
+  cardGame?: string
 }
 
 /** Lightweight metadata for the collections home/picker screen. */
@@ -32,5 +34,6 @@ export interface CollectionSummary {
   name: string
   cardCount: number
   bannerUrl: string | null
+  cardGame: string | null
   updatedAt: string | null
 }

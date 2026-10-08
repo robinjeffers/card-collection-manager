@@ -18,7 +18,9 @@ leave your machine.
 
 ## Screenshots
 
-**Collections home** — every collection as a card with its banner and card count.
+**Collections home** — every collection as a card with its banner and card count. Each collection
+can have an optional **Card game** label (set when creating it, or via the edit/pencil button), shown
+under the collection name on the home page, inside the collection, and on its share link.
 
 ![The collections home page showing the Card Collection Manager header and a "DSBG Treasure Deck" collection card with a banner image](./docs/screenshots/home.png)
 

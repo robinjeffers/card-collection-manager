@@ -94,5 +94,6 @@ export async function getSharedCollection(token: string): Promise<SharedCollecti
     return { id: row.id, values }
   })
 
-  return { name: found.name, data: { columns, rows }, allowedFiles }
+  const cardGame = typeof data.cardGame === "string" && data.cardGame ? data.cardGame : undefined
+  return { name: found.name, data: { columns, rows, cardGame }, allowedFiles }
 }

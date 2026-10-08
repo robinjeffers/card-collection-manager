@@ -32,8 +32,14 @@ export function CollectionsHome({
 
   const [createOpen, setCreateOpen] = useState(false)
   const [newName, setNewName] = useState("")
+  const [newCardGame, setNewCardGame] = useState("")
   const [renaming, setRenaming] = useState<CollectionSummary | null>(null)
   const [renameValue, setRenameValue] = useState("")
+  const [renameCardGame, setRenameCardGame] = useState("")
+
+  const knownCardGames = Array.from(
+    new Set(collections.map((c) => c.cardGame).filter((g): g is string => !!g)),
+  ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
   const [deleting, setDeleting] = useState<CollectionSummary | null>(null)
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [bannering, setBannering] = useState<CollectionSummary | null>(null)
@@ -45,9 +51,10 @@ export function CollectionsHome({
 
   const submitCreate = () => {
     startTransition(async () => {
-      const { id } = await createCollection(newName)
+      const { id } = await createCollection(newName, newCardGame)
       setCreateOpen(false)
       setNewName("")
+      setNewCardGame("")
       router.push(`/collections/${id}`)
     })
   }
@@ -56,7 +63,7 @@ export function CollectionsHome({
     if (!renaming) return
     const target = renaming
     startTransition(async () => {
-      await renameCollection(target.id, renameValue)
+      await renameCollection(target.id, renameValue, renameCardGame)
       setRenaming(null)
       router.refresh()
     })
@@ -154,6 +161,7 @@ export function CollectionsHome({
           type="button"
           onClick={() => {
             setNewName("")
+            setNewCardGame("")
             setCreateOpen(true)
           }}
           className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/40 p-6 text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
@@ -186,6 +194,9 @@ export function CollectionsHome({
               </span>
               <span className="flex flex-1 flex-col gap-0.5 p-5">
                 <span className="font-medium text-balance">{c.name}</span>
+                {c.cardGame ? (
+                  <span className="text-sm font-medium text-primary">{c.cardGame}</span>
+                ) : null}
                 <span className="text-xs text-muted-foreground">
                   {c.cardCount} card{c.cardCount === 1 ? "" : "s"}
                 </span>
@@ -211,10 +222,11 @@ export function CollectionsHome({
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label={`Rename ${c.name}`}
+                aria-label={`Edit ${c.name}`}
                 onClick={() => {
                   setRenaming(c)
                   setRenameValue(c.name)
+                  setRenameCardGame(c.cardGame ?? "")
                 }}
               >
                 <Pencil className="size-4" />
@@ -327,6 +339,20 @@ export function CollectionsHome({
               placeholder="e.g. Fire Deck"
             />
           </div>
+          <div>
+            <Label htmlFor="new-card-game">Card game</Label>
+            <Input
+              id="new-card-game"
+              list="card-game-options"
+              maxLength={80}
+              value={newCardGame}
+              onChange={(e) => setNewCardGame(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) submitCreate()
+              }}
+              placeholder="Optional, e.g. Elemental Clash"
+            />
+          </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={pending}>
               Cancel
@@ -338,7 +364,13 @@ export function CollectionsHome({
         </div>
       </Modal>
 
-      <Modal open={!!renaming} onClose={() => setRenaming(null)} title="Rename collection">
+      <datalist id="card-game-options">
+        {knownCardGames.map((game) => (
+          <option key={game} value={game} />
+        ))}
+      </datalist>
+
+      <Modal open={!!renaming} onClose={() => setRenaming(null)} title="Edit collection">
         <div className="flex flex-col gap-4">
           <div>
             <Label htmlFor="rename">Collection name</Label>
@@ -350,6 +382,20 @@ export function CollectionsHome({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.nativeEvent.isComposing) submitRename()
               }}
+            />
+          </div>
+          <div>
+            <Label htmlFor="rename-card-game">Card game</Label>
+            <Input
+              id="rename-card-game"
+              list="card-game-options"
+              maxLength={80}
+              value={renameCardGame}
+              onChange={(e) => setRenameCardGame(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) submitRename()
+              }}
+              placeholder="Optional, e.g. Elemental Clash"
             />
           </div>
           <div className="flex justify-end gap-2">
