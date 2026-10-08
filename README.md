@@ -129,6 +129,10 @@ shape yourself:
   covers every collection. Players can switch between decks or pick **All decks** to search every
   card together, and each result shows which deck it belongs to. New collections appear on the link
   automatically.
+- **Artwork first on phones.** On mobile, the card list, deck switcher, and tag filters are tucked
+  behind a **Browse** button so the artwork sits right under the search box. Typing shows matching
+  cards as you go, and Enter opens the first match. A badge on **Browse** shows how many filters are
+  active.
 - **Only what players need.** Shared pages never expose templates, bleed artwork, or editing
   controls. Images are served through the share link, so the token is checked on every request.
 - **Stay in control.** **New link** replaces the URL (the old one stops working right away), and
