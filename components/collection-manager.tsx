@@ -197,6 +197,9 @@ export function CollectionManager({
           </Button>
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-balance">{collectionName}</h1>
+            {collection.cardGame ? (
+              <p className="text-sm font-medium text-primary">{collection.cardGame}</p>
+            ) : null}
             <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <span>
                 {collection.rows.length} card{collection.rows.length === 1 ? "" : "s"}

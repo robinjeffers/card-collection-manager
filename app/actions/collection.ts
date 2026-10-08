@@ -107,6 +107,7 @@ export async function listCollections(): Promise<CollectionSummary[]> {
         name: r.name,
         cardCount: data ? data.rows.length : 0,
         bannerUrl: data && typeof data.banner === "string" && data.banner ? data.banner : null,
+        cardGame: data && typeof data.cardGame === "string" && data.cardGame ? data.cardGame : null,
         updatedAt: r.updatedAt ? new Date(r.updatedAt).toISOString() : null,
       }
     })
@@ -138,33 +139,62 @@ export async function getCollectionById(
   return { id: existing.id, name: existing.name, data: normalized }
 }
 
-export async function createCollection(name: string): Promise<{ id: string }> {
+const MAX_CARD_GAME_LENGTH = 80
+
+function cleanCardGame(value: string | undefined): string {
+  return (value ?? "").trim().slice(0, MAX_CARD_GAME_LENGTH)
+}
+
+export async function createCollection(name: string, cardGame?: string): Promise<{ id: string }> {
   const userId = await getUserId()
   const trimmed = name.trim() || "Untitled collection"
   const id = crypto.randomUUID()
+  const data: Collection = emptyCollection()
+  const game = cleanCardGame(cardGame)
+  if (game) data.cardGame = game
 
   await db.insert(collectionTable).values({
     id,
     userId,
     name: trimmed,
-    data: emptyCollection(),
+    data,
   })
 
   revalidatePath("/")
   return { id }
 }
 
-export async function renameCollection(id: string, name: string): Promise<{ ok: true }> {
+/**
+ * Updates a collection's name and card game. The card game lives inside the
+ * `data` blob (like the banner), so it needs no schema change and is included
+ * in backups. An empty card game clears it.
+ */
+export async function renameCollection(id: string, name: string, cardGame?: string): Promise<{ ok: true }> {
   await getUserId()
   const trimmed = name.trim()
   if (!trimmed) throw new Error("Name is required")
 
+  const [existing] = await db
+    .select()
+    .from(collectionTable)
+    .where(eq(collectionTable.id, id))
+    .limit(1)
+  if (!existing || !isCollection(existing.data)) throw new Error("Collection not found")
+
+  const nextData: Collection = { ...existing.data }
+  if (cardGame !== undefined) {
+    const game = cleanCardGame(cardGame)
+    if (game) nextData.cardGame = game
+    else delete nextData.cardGame
+  }
+
   await db
     .update(collectionTable)
-    .set({ name: trimmed, updatedAt: new Date() })
+    .set({ name: trimmed, data: nextData, updatedAt: new Date() })
     .where(eq(collectionTable.id, id))
 
   revalidatePath("/")
+  revalidatePath(`/collections/${id}`)
   return { ok: true }
 }
 

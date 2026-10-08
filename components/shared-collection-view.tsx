@@ -1,89 +1,163 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Eye, Search } from "lucide-react"
+import { Eye, Layers, Search } from "lucide-react"
 import { ImagePreview } from "@/components/image-preview"
 import { fieldClass } from "@/components/ui/field"
 import { tagStyle } from "@/lib/tag-color"
 import { cn } from "@/lib/utils"
-import type { Collection } from "@/lib/types"
+import type { Collection, Column } from "@/lib/types"
 
 const LIST_LIMIT = 200
+const ALL_DECKS = "__all__"
 
-export function SharedCollectionView({ name, collection }: { name: string; collection: Collection }) {
+interface Deck {
+  id: string
+  name: string
+  collection: Collection
+}
+
+interface Entry {
+  key: string
+  deck: Deck
+  row: Collection["rows"][number]
+  name: string
+}
+
+function rowTags(entry: Entry): string[] {
+  return entry.deck.collection.columns
+    .filter((c) => c.type === "tag")
+    .flatMap((col) => {
+      const v = entry.row.values[col.id]
+      return Array.isArray(v) ? (v as string[]) : []
+    })
+}
+
+export function SharedCollectionView({ kind, decks }: { kind: "collection" | "library"; decks: Deck[] }) {
+  const isLibrary = kind === "library"
   const [search, setSearch] = useState("")
   const [activeTags, setActiveTags] = useState<string[]>([])
+  const [deckFilter, setDeckFilter] = useState<string>(ALL_DECKS)
 
-  const tagCols = useMemo(() => collection.columns.filter((c) => c.type === "tag"), [collection.columns])
-  const detailCols = useMemo(
-    () => collection.columns.filter((c) => (c.type === "text" || c.type === "number") && c.id !== "name"),
-    [collection.columns],
+  const entries = useMemo<Entry[]>(
+    () =>
+      decks
+        .flatMap((deck) =>
+          deck.collection.rows.map((row) => ({
+            key: `${deck.id}:${row.id}`,
+            deck,
+            row,
+            name: String(row.values.name ?? ""),
+          })),
+        )
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })),
+    [decks],
+  )
+
+  const scopedDecks = useMemo(
+    () => (deckFilter === ALL_DECKS ? decks : decks.filter((d) => d.id === deckFilter)),
+    [decks, deckFilter],
   )
 
   const tagChips = useMemo(() => {
     const seen = new Set<string>()
     const chips: { tag: string; options: string[] }[] = []
-    for (const col of tagCols) {
-      const options = col.options ?? []
-      for (const opt of options) {
-        if (seen.has(opt)) continue
-        seen.add(opt)
-        chips.push({ tag: opt, options })
+    for (const deck of scopedDecks) {
+      for (const col of deck.collection.columns) {
+        if (col.type !== "tag") continue
+        const options = col.options ?? []
+        for (const opt of options) {
+          if (seen.has(opt)) continue
+          seen.add(opt)
+          chips.push({ tag: opt, options })
+        }
       }
     }
     return chips
-  }, [tagCols])
+  }, [scopedDecks])
 
-  const sortedRows = useMemo(
-    () =>
-      [...collection.rows].sort((a, b) =>
-        String(a.values.name ?? "").localeCompare(String(b.values.name ?? ""), undefined, {
-          sensitivity: "base",
-          numeric: true,
-        }),
-      ),
-    [collection.rows],
-  )
-
-  const filteredRows = useMemo(() => {
+  const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return sortedRows.filter((row) => {
-      if (query && !String(row.values.name ?? "").toLowerCase().includes(query)) return false
+    return entries.filter((entry) => {
+      if (deckFilter !== ALL_DECKS && entry.deck.id !== deckFilter) return false
+      if (query && !entry.name.toLowerCase().includes(query)) return false
       if (activeTags.length > 0) {
-        const rowTags = tagCols.flatMap((col) => {
-          const v = row.values[col.id]
-          return Array.isArray(v) ? (v as string[]) : []
-        })
-        if (!activeTags.every((t) => rowTags.includes(t))) return false
+        const tags = rowTags(entry)
+        if (!activeTags.every((t) => tags.includes(t))) return false
       }
       return true
     })
-  }, [sortedRows, search, activeTags, tagCols])
+  }, [entries, search, activeTags, deckFilter])
 
-  const [selectedId, setSelectedId] = useState<string | null>(sortedRows[0]?.id ?? null)
-  const selectedRow = collection.rows.find((r) => r.id === selectedId) ?? null
+  const [selectedKey, setSelectedKey] = useState<string | null>(entries[0]?.key ?? null)
+  const selected = entries.find((e) => e.key === selectedKey) ?? null
 
-  const details = selectedRow
-    ? detailCols
-        .map((col) => ({ col, value: selectedRow.values[col.id] }))
+  const details = selected
+    ? selected.deck.collection.columns
+        .filter((col: Column) => (col.type === "text" || col.type === "number") && col.id !== "name")
+        .map((col) => ({ col, value: selected.row.values[col.id] }))
         .filter(({ value }) => value !== null && value !== undefined && String(value).trim() !== "")
     : []
 
   const toggleTag = (tag: string) =>
     setActiveTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
 
+  const changeDeck = (id: string) => {
+    setDeckFilter(id)
+    setActiveTags([])
+  }
+
+  const gameNames = Array.from(new Set(decks.map((d) => d.collection.cardGame).filter(Boolean)))
+  const sharedGame = gameNames.length === 1 && decks.every((d) => d.collection.cardGame) ? gameNames[0] : undefined
+  const singleDeck = decks[0]
+  const title = isLibrary ? (sharedGame ?? "All decks") : (singleDeck?.name ?? "Shared collection")
+  const subtitle = isLibrary ? undefined : singleDeck?.collection.cardGame
+  const showDeckLabels = isLibrary && deckFilter === ALL_DECKS
+
   return (
     <div className="mx-auto flex min-h-svh w-full max-w-6xl flex-col gap-6 px-4 py-6 lg:px-6">
       <header className="flex flex-col gap-1">
         <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           <Eye className="size-3.5" />
-          Shared collection · read only
+          {isLibrary ? "Shared decks" : "Shared collection"} · read only
         </p>
-        <h1 className="text-2xl font-semibold tracking-tight text-balance">{name}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-balance">{title}</h1>
+        {subtitle ? <p className="text-sm font-medium text-primary">{subtitle}</p> : null}
         <p className="text-sm text-muted-foreground">
-          {collection.rows.length} card{collection.rows.length === 1 ? "" : "s"}
+          {isLibrary ? `${decks.length} deck${decks.length === 1 ? "" : "s"} · ` : ""}
+          {entries.length} card{entries.length === 1 ? "" : "s"}
         </p>
       </header>
+
+      {isLibrary && decks.length > 1 ? (
+        <nav aria-label="Decks" className="-mx-4 overflow-x-auto px-4 lg:mx-0 lg:px-0">
+          <div className="flex w-max gap-2 lg:w-auto lg:flex-wrap">
+            {[{ id: ALL_DECKS, name: "All decks", count: entries.length }, ...decks.map((d) => ({ id: d.id, name: d.name, count: d.collection.rows.length }))].map(
+              (option) => {
+                const active = deckFilter === option.id
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => changeDeck(option.id)}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors",
+                      active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                    )}
+                  >
+                    {option.id === ALL_DECKS ? <Layers className="size-3.5" /> : null}
+                    {option.name}
+                    <span className={cn("text-xs", active ? "opacity-80" : "opacity-60")}>{option.count}</span>
+                  </button>
+                )
+              },
+            )}
+          </div>
+        </nav>
+      ) : null}
 
       <div className="flex flex-1 flex-col gap-6 lg:grid lg:grid-cols-[1fr_420px] lg:items-start">
         <section aria-label="Cards" className="flex min-w-0 flex-col gap-3">
@@ -95,7 +169,7 @@ export function SharedCollectionView({ name, collection }: { name: string; colle
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) {
                   e.preventDefault()
-                  if (filteredRows[0]) setSelectedId(filteredRows[0].id)
+                  if (filtered[0]) setSelectedKey(filtered[0].key)
                 }
               }}
               placeholder="Search cards by name…"
@@ -129,22 +203,27 @@ export function SharedCollectionView({ name, collection }: { name: string; colle
             </div>
           ) : null}
 
-          {filteredRows.length > 0 ? (
-            <ul className="flex max-h-[28rem] flex-col overflow-y-auto rounded-xl border border-border lg:max-h-[calc(100svh-14rem)]">
-              {filteredRows.slice(0, LIST_LIMIT).map((row) => {
-                const active = row.id === selectedId
+          {filtered.length > 0 ? (
+            <ul className="flex max-h-[28rem] flex-col overflow-y-auto rounded-xl border border-border lg:max-h-[calc(100svh-16rem)]">
+              {filtered.slice(0, LIST_LIMIT).map((entry) => {
+                const active = entry.key === selectedKey
                 return (
-                  <li key={row.id} className="border-b border-border last:border-0">
+                  <li key={entry.key} className="border-b border-border last:border-0">
                     <button
                       type="button"
-                      onClick={() => setSelectedId(row.id)}
+                      onClick={() => setSelectedKey(entry.key)}
                       aria-current={active ? "true" : undefined}
                       className={cn(
-                        "flex w-full items-center px-3 py-2.5 text-left text-sm transition-colors",
+                        "flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm transition-colors",
                         active ? "bg-primary/10 font-medium text-foreground" : "text-muted-foreground hover:bg-muted/50",
                       )}
                     >
-                      {String(row.values.name ?? "") || "Untitled card"}
+                      <span className="min-w-0 truncate">{entry.name || "Untitled card"}</span>
+                      {showDeckLabels ? (
+                        <span className="shrink-0 truncate text-xs font-normal text-muted-foreground">
+                          {entry.deck.name}
+                        </span>
+                      ) : null}
                     </button>
                   </li>
                 )
@@ -155,17 +234,23 @@ export function SharedCollectionView({ name, collection }: { name: string; colle
               No cards match your search.
             </p>
           )}
-          {filteredRows.length > LIST_LIMIT ? (
+          {filtered.length > LIST_LIMIT ? (
             <p className="text-xs text-muted-foreground">
-              Showing the first {LIST_LIMIT} of {filteredRows.length} matches. Refine your search to narrow it down.
+              Showing the first {LIST_LIMIT} of {filtered.length} matches. Refine your search to narrow it down.
             </p>
           ) : null}
         </section>
 
         <aside aria-label="Card details" className="flex flex-col gap-4 lg:sticky lg:top-6">
-          <ImagePreview row={selectedRow} columns={collection.columns} />
-          {details.length > 0 ? (
+          <ImagePreview row={selected?.row ?? null} columns={selected?.deck.collection.columns ?? []} />
+          {(isLibrary && selected) || details.length > 0 ? (
             <dl className="flex flex-col rounded-xl border border-border">
+              {isLibrary && selected ? (
+                <div className="flex flex-col gap-0.5 border-b border-border px-3 py-2.5 last:border-0">
+                  <dt className="text-xs font-medium text-muted-foreground">Deck</dt>
+                  <dd className="text-sm leading-relaxed">{selected.deck.name}</dd>
+                </div>
+              ) : null}
               {details.map(({ col, value }) => (
                 <div key={col.id} className="flex flex-col gap-0.5 border-b border-border px-3 py-2.5 last:border-0">
                   <dt className="text-xs font-medium text-muted-foreground">{col.name}</dt>

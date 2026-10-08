@@ -92,3 +92,11 @@ CREATE TABLE IF NOT EXISTS "share_link" (
   "createdBy" text NOT NULL,
   "createdAt" timestamp NOT NULL DEFAULT now()
 );
+
+-- One read-only link covering every collection.
+CREATE TABLE IF NOT EXISTS "share_library_link" (
+  "token" text PRIMARY KEY,
+  "scope" text NOT NULL UNIQUE,
+  "createdBy" text NOT NULL,
+  "createdAt" timestamp NOT NULL DEFAULT now()
+);

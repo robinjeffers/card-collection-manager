@@ -2,7 +2,12 @@
 
 import { useState } from "react"
 import { Check, Copy, Link2, Loader2, RefreshCw, Trash2 } from "lucide-react"
-import { createShareLink, revokeShareLink } from "@/app/actions/share"
+import {
+  createLibraryShareLink,
+  createShareLink,
+  revokeLibraryShareLink,
+  revokeShareLink,
+} from "@/app/actions/share"
 import { Button } from "@/components/ui/button"
 import { Modal } from "@/components/ui/modal"
 import { fieldClass } from "@/components/ui/field"
@@ -11,7 +16,8 @@ import { useToast } from "@/components/ui/toast"
 interface ShareDialogProps {
   open: boolean
   onClose: () => void
-  collectionId: string
+  /** Omit to manage the link covering every collection. */
+  collectionId?: string
   token: string | null
   onTokenChange: (token: string | null) => void
 }
@@ -20,13 +26,14 @@ export function ShareDialog({ open, onClose, collectionId, token, onTokenChange 
   const { toast } = useToast()
   const [busy, setBusy] = useState<"create" | "revoke" | null>(null)
   const [copied, setCopied] = useState(false)
+  const isLibrary = collectionId === undefined
 
   const url = token && typeof window !== "undefined" ? `${window.location.origin}/share/${token}` : ""
 
   const generate = async () => {
     setBusy("create")
     try {
-      const { token: next } = await createShareLink(collectionId)
+      const { token: next } = isLibrary ? await createLibraryShareLink() : await createShareLink(collectionId)
       onTokenChange(next)
       setCopied(false)
     } catch {
@@ -39,7 +46,8 @@ export function ShareDialog({ open, onClose, collectionId, token, onTokenChange 
   const revoke = async () => {
     setBusy("revoke")
     try {
-      await revokeShareLink(collectionId)
+      if (isLibrary) await revokeLibraryShareLink()
+      else await revokeShareLink(collectionId)
       onTokenChange(null)
       toast({ message: "Share link turned off." })
     } catch {
@@ -63,8 +71,12 @@ export function ShareDialog({ open, onClose, collectionId, token, onTokenChange 
     <Modal
       open={open}
       onClose={onClose}
-      title="Share collection"
-      description="Anyone with the link can search cards and view artwork, tags, and text fields. Templates and bleed artwork are never shared, and nothing can be edited."
+      title={isLibrary ? "Share all collections" : "Share collection"}
+      description={
+        isLibrary
+          ? "One link to every collection — players can switch decks or search all cards at once. New collections appear automatically. Templates and bleed artwork are never shared, and nothing can be edited."
+          : "Anyone with the link can search cards and view artwork, tags, and text fields. Templates and bleed artwork are never shared, and nothing can be edited."
+      }
     >
       {token ? (
         <div className="flex flex-col gap-4">
@@ -97,7 +109,9 @@ export function ShareDialog({ open, onClose, collectionId, token, onTokenChange 
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">Sharing is off for this collection.</p>
+          <p className="text-sm text-muted-foreground">
+            {isLibrary ? "Sharing all collections is off." : "Sharing is off for this collection."}
+          </p>
           <Button onClick={generate} disabled={busy !== null} className="self-start">
             {busy === "create" ? <Loader2 className="animate-spin" /> : <Link2 />}
             Create share link

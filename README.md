@@ -18,7 +18,9 @@ leave your machine.
 
 ## Screenshots
 
-**Collections home** — every collection as a card with its banner and card count.
+**Collections home** — every collection as a card with its banner and card count. Each collection
+can have an optional **Card game** label (set when creating it, or via the edit/pencil button), shown
+under the collection name on the home page, inside the collection, and on its share link.
 
 ![The collections home page showing the Card Collection Manager header and a "DSBG Treasure Deck" collection card with a banner image](./docs/screenshots/home.png)
 
@@ -123,6 +125,10 @@ shape yourself:
 - **Share a collection with players.** Click **Share** in a collection's header to create a
   public, read-only link (`/share/<token>`). Anyone with the link can search cards by name, filter
   by tag, and view each card's artwork, tags, and text fields. No account is needed.
+- **Share all collections at once.** Click **Share all** on the home page for a single link that
+  covers every collection. Players can switch between decks or pick **All decks** to search every
+  card together, and each result shows which deck it belongs to. New collections appear on the link
+  automatically.
 - **Only what players need.** Shared pages never expose templates, bleed artwork, or editing
   controls. Images are served through the share link, so the token is checked on every request.
 - **Stay in control.** **New link** replaces the URL (the old one stops working right away), and

@@ -23,6 +23,15 @@ export const shareLink = pgTable("share_link", {
   createdAt: timestamp("createdAt").notNull().defaultNow(),
 })
 
+// One link covering every collection. `scope` is a fixed key so only one row
+// can exist; rotating replaces it and invalidates the old URL.
+export const shareLibraryLink = pgTable("share_library_link", {
+  token: text("token").primaryKey(),
+  scope: text("scope").notNull().unique(),
+  createdBy: text("createdBy").notNull(),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+})
+
 
 export const account = pgTable("account", {
   id: text("id").primaryKey(),
