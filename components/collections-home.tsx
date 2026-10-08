@@ -2,9 +2,22 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { Download, ImageIcon, KeyRound, Layers, LogOut, Pencil, Plus, ShieldCheck, Sparkles, Trash2 } from "lucide-react"
+import {
+  Download,
+  ImageIcon,
+  KeyRound,
+  Layers,
+  LogOut,
+  Pencil,
+  Plus,
+  Share2,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
+} from "lucide-react"
 import { signOut } from "@/lib/auth-client"
 import { ChangePasswordDialog } from "@/components/change-password-dialog"
+import { ShareDialog } from "@/components/share-dialog"
 import { ImageUpload } from "@/components/image-upload"
 import {
   createCollection,
@@ -22,13 +35,17 @@ export function CollectionsHome({
   collections,
   userName,
   isAdmin = false,
+  libraryShareToken = null,
 }: {
   collections: CollectionSummary[]
   userName: string
   isAdmin?: boolean
+  libraryShareToken?: string | null
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareToken, setShareToken] = useState<string | null>(libraryShareToken)
 
   const [createOpen, setCreateOpen] = useState(false)
   const [newName, setNewName] = useState("")
@@ -127,6 +144,12 @@ export function CollectionsHome({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {collections.length > 0 ? (
+            <Button variant="outline" onClick={() => setShareOpen(true)}>
+              <Share2 />
+              {shareToken ? "Shared" : "Share all"}
+            </Button>
+          ) : null}
           {isAdmin ? (
             <Button variant="outline" onClick={() => router.push("/admin")}>
               <ShieldCheck />
@@ -155,6 +178,13 @@ export function CollectionsHome({
           </Button>
         </div>
       </header>
+
+      <ShareDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        token={shareToken}
+        onTokenChange={setShareToken}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <button
