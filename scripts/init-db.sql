@@ -84,3 +84,11 @@ END $$;
 ALTER TABLE "collection" ALTER COLUMN "id" SET NOT NULL;
 ALTER TABLE "collection" ALTER COLUMN "name" SET NOT NULL;
 CREATE INDEX IF NOT EXISTS "collection_userId_idx" ON "collection" ("userId");
+
+-- Read-only share links (also created lazily by the app on existing volumes).
+CREATE TABLE IF NOT EXISTS "share_link" (
+  "token" text PRIMARY KEY,
+  "collectionId" text NOT NULL UNIQUE,
+  "createdBy" text NOT NULL,
+  "createdAt" timestamp NOT NULL DEFAULT now()
+);

@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Check, Columns3, ImagePlus, Layers, Loader2, LogOut, Pencil, Plus, Search, ShieldCheck, Sheet, Trash2, X } from "lucide-react"
+import { ArrowLeft, Check, Columns3, ImagePlus, Layers, Loader2, LogOut, Pencil, Plus, Search, Share2, ShieldCheck, Sheet, Trash2, X } from "lucide-react"
+import { ShareDialog } from "@/components/share-dialog"
 import { useCollection } from "@/hooks/use-collection"
 import { signOut } from "@/lib/auth-client"
 import { DataGrid } from "@/components/data-grid"
@@ -28,13 +29,17 @@ export function CollectionManager({
   initialCollection,
   userName,
   isAdmin = false,
+  initialShareToken = null,
 }: {
   collectionId: string
   collectionName: string
   initialCollection: Collection
   userName: string
   isAdmin?: boolean
+  initialShareToken?: string | null
 }) {
+  const [shareToken, setShareToken] = useState<string | null>(initialShareToken)
+  const [shareOpen, setShareOpen] = useState(false)
   const router = useRouter()
   const {
     collection,
@@ -243,6 +248,10 @@ export function CollectionManager({
               Import Fields
             </Button>
           ) : null}
+          <Button variant="outline" onClick={() => setShareOpen(true)}>
+            <Share2 />
+            {shareToken ? "Shared" : "Share"}
+          </Button>
           <Button onClick={openNewCard}>
             <Plus />
             New Card
@@ -485,6 +494,14 @@ export function CollectionManager({
           updateRows(updates)
           clearChecked()
         }}
+      />
+
+      <ShareDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        collectionId={collectionId}
+        token={shareToken}
+        onTokenChange={setShareToken}
       />
 
       <Modal

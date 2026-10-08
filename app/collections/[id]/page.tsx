@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/admin"
 import { getCollectionById } from "@/app/actions/collection"
 import { CollectionManager } from "@/components/collection-manager"
+import { getShareTokenFor } from "@/lib/share"
 
 export default async function CollectionPage({
   params,
@@ -15,6 +16,7 @@ export default async function CollectionPage({
   const found = await getCollectionById(id)
   // Collection doesn't exist — send them back to the shared list.
   if (!found) redirect("/")
+  const shareToken = await getShareTokenFor(found.id)
 
   return (
     <main className="min-h-svh bg-background">
@@ -24,6 +26,7 @@ export default async function CollectionPage({
         initialCollection={found.data}
         userName={current.name}
         isAdmin={current.role === "admin"}
+        initialShareToken={shareToken}
       />
     </main>
   )

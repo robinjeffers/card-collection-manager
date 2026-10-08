@@ -121,7 +121,7 @@ export function previewUrl(fullUrl: string): string | null {
 
 /** Shared helper: swap a full-image URL's extension for a derived-file suffix. */
 function siblingUrl(fullUrl: string, suffix: string): string | null {
-  if (!fullUrl.startsWith("/api/uploads/")) return null
+  if (!fullUrl.startsWith("/api/uploads/") && !fullUrl.startsWith("/api/share/")) return null
   const slash = fullUrl.lastIndexOf("/")
   const dir = fullUrl.slice(0, slash + 1)
   const file = fullUrl.slice(slash + 1)
