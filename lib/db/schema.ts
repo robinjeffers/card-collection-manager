@@ -14,18 +14,15 @@ export const user = pgTable("user", {
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 })
 
-export const session = pgTable("session", {
-  id: text("id").primaryKey(),
-  expiresAt: timestamp("expiresAt").notNull(),
-  token: text("token").notNull().unique(),
+// Public read-only share links: one active token per collection. Rotating the
+// link replaces the row, which invalidates the old URL.
+export const shareLink = pgTable("share_link", {
+  token: text("token").primaryKey(),
+  collectionId: text("collectionId").notNull().unique(),
+  createdBy: text("createdBy").notNull(),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
-  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
-  ipAddress: text("ipAddress"),
-  userAgent: text("userAgent"),
-  userId: text("userId")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
 })
+
 
 export const account = pgTable("account", {
   id: text("id").primaryKey(),

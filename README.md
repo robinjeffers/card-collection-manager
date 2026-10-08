@@ -118,6 +118,17 @@ shape yourself:
   named `Card Name_Bleed.<ext>` to match the import convention), and template files
   (`templates/`).
 
+### Read-only share links
+
+- **Share a collection with players.** Click **Share** in a collection's header to create a
+  public, read-only link (`/share/<token>`). Anyone with the link can search cards by name, filter
+  by tag, and view each card's artwork, tags, and text fields. No account is needed.
+- **Only what players need.** Shared pages never expose templates, bleed artwork, or editing
+  controls. Images are served through the share link, so the token is checked on every request.
+- **Stay in control.** **New link** replaces the URL (the old one stops working right away), and
+  **Turn off sharing** disables it entirely. Shared pages are marked `noindex`, so search
+  engines won't list them.
+
 ### Safety nets
 
 - **Confirmation dialogs** guard destructive actions like deleting a column.
