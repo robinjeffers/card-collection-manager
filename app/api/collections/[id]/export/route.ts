@@ -2,7 +2,7 @@ import { readFile } from "fs/promises"
 import path from "path"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
-import { zipSync, strToU8 } from "fflate"
+import { Zip, ZipDeflate, ZipPassThrough, strToU8 } from "fflate"
 import { eq } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
@@ -159,17 +159,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return { ...r, values }
   })
 
-  // Read the actual bytes for each referenced media file.
-  const zipEntries: Record<string, Uint8Array> = {}
-  for (const { folder, filename, abs } of toRead) {
-    try {
-      const data = await readFile(abs)
-      zipEntries[`${folder}/${filename}`] = new Uint8Array(data)
-    } catch {
-      // Skip missing files rather than failing the whole export.
-    }
-  }
-
   const manifest = {
     format: "card-collection-export",
     version: 1,
@@ -179,13 +168,58 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     collection: { columns: source.columns, rows } satisfies Collection,
   }
 
-  zipEntries["collection.json"] = strToU8(JSON.stringify(manifest, null, 2))
-  zipEntries["collection.csv"] = strToU8(buildCsv(source.columns, rows))
-
-  const zipped = zipSync(zipEntries, { level: 6 })
   const safeName = row.name.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "collection"
 
-  return new NextResponse(new Uint8Array(zipped), {
+  // Stream the archive instead of building it in memory: large collections
+  // otherwise exhaust memory / block the event loop and the connection drops
+  // (ERR_EMPTY_RESPONSE). Files are read one per pull, so memory stays bounded
+  // by a single file plus whatever the client hasn't consumed yet. Media is
+  // stored uncompressed — images are already compressed, and deflating them
+  // again costs a lot of CPU for almost no size benefit.
+  let zip: Zip
+  let nextFile = 0
+
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      zip = new Zip((err, chunk, final) => {
+        if (err) {
+          controller.error(err)
+          return
+        }
+        if (chunk.length) controller.enqueue(chunk)
+        if (final) controller.close()
+      })
+
+      const addText = (name: string, text: string) => {
+        const entry = new ZipDeflate(name, { level: 6 })
+        zip.add(entry)
+        entry.push(strToU8(text), true)
+      }
+      addText("collection.json", JSON.stringify(manifest, null, 2))
+      addText("collection.csv", buildCsv(source.columns, rows))
+    },
+    async pull() {
+      while (nextFile < toRead.length) {
+        const { folder, filename, abs } = toRead[nextFile++]
+        let data: Buffer
+        try {
+          data = await readFile(abs)
+        } catch {
+          continue // Skip missing files rather than failing the whole export.
+        }
+        const entry = new ZipPassThrough(`${folder}/${filename}`)
+        zip.add(entry)
+        entry.push(new Uint8Array(data.buffer, data.byteOffset, data.byteLength), true)
+        return
+      }
+      zip.end()
+    },
+    cancel() {
+      zip?.terminate()
+    },
+  })
+
+  return new NextResponse(body, {
     headers: {
       "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="${safeName}.zip"`,
